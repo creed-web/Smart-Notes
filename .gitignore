@@ -1,0 +1,168 @@
+# Smart Notes System - Git Ignore File
+
+# Environment Files (Contains API Keys and Secrets)
+.env
+.env.local
+.env.production
+.env.staging
+.env.development
+*.env
+
+# API Keys and Secret Files
+api_keys.txt
+secrets.json
+config/secrets.py
+**/secrets/**
+**/*secret*
+**/*key*
+**/*token*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+backend/venv/
+backend/env/
+backend/.venv/
+venv/
+env/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE and Editor Files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+backend/*.log
+backend/logs/
+smart_notes.log
+
+# Database Files
+*.db
+*.sqlite
+*.sqlite3
+database.db
+*.db-journal
+
+# Temporary Files
+*.tmp
+*.temp
+temp/
+tmp/
+.cache/
+.pytest_cache/
+
+# OS Generated Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Chrome Extension Development
+extension/*.crx
+extension/*.pem
+extension/key.pem
+extension/.private/
+
+# Node.js (if you add any)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.eslintcache
+
+# Coverage Reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# Backup Files
+*.bak
+*.backup
+*~
+*.orig
+
+# Test Files (if containing sensitive data)
+test_data/
+test_config/
+**/test_secrets/
+
+# Documentation Build
+docs/_build/
+site/
+
+# Package Files
+*.tar.gz
+*.zip
+*.rar
+
+# Local Configuration Overrides
+local_settings.py
+local_config.json
+config.local.json
+
+# Hugging Face Cache
+.cache/huggingface/
+
+# PDF Output Files (if you don't want to track generated PDFs)
+generated_pdfs/
+output/*.pdf
+
+# User-specific files
+user_notes/
+user_data/
+personal_config/
