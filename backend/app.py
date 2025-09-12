@@ -19,6 +19,7 @@ from reportlab.lib.units import inch
 import re
 import nltk
 from nltk.tokenize import sent_tokenize, word_tokenize
+from export_system import ExportSystem
 
 # Download required NLTK data
 try:
@@ -48,6 +49,9 @@ class SmartNotesApp:
         self.MAX_CHUNK_SIZE = 1000  # Max words per chunk
         self.MIN_SUMMARY_LENGTH = 50
         self.MAX_SUMMARY_LENGTH = 300
+        
+        # Initialize export system
+        self.export_system = ExportSystem()
         
         # Setup routes
         self.setup_routes()
@@ -114,7 +118,7 @@ class SmartNotesApp:
 
         @self.app.route('/download-pdf', methods=['POST'])
         def download_pdf():
-            """Generate and download PDF of smart notes"""
+            """Generate and download PDF of smart notes (legacy endpoint)"""
             try:
                 data = request.json
                 if not data or 'notes' not in data:
@@ -135,6 +139,59 @@ class SmartNotesApp:
                 
             except Exception as e:
                 logger.error(f"Error generating PDF: {str(e)}")
+                return jsonify({'error': str(e)}), 500
+        
+        @self.app.route('/export-formats', methods=['GET'])
+        def get_export_formats():
+            """Get list of supported export formats"""
+            try:
+                formats = self.export_system.get_supported_formats()
+                return jsonify({
+                    'success': True,
+                    'formats': formats
+                })
+            except Exception as e:
+                logger.error(f"Error getting export formats: {str(e)}")
+                return jsonify({'error': str(e)}), 500
+        
+        @self.app.route('/export', methods=['POST'])
+        def export_notes():
+            """Export notes to specified format"""
+            try:
+                data = request.json
+                if not data or 'notes' not in data or 'format' not in data:
+                    return jsonify({'error': 'Missing notes or format in request'}), 400
+                
+                notes = data['notes']
+                export_format = data['format']
+                page_info = data.get('pageInfo', {})
+                options = data.get('options', {})
+                
+                logger.info(f"Exporting notes to {export_format}")
+                
+                # Export using the export system
+                result = self.export_system.export_notes(notes, page_info, export_format, options)
+                
+                if result.get('success'):
+                    # For file downloads, return the file
+                    if 'data' in result:
+                        return send_file(
+                            BytesIO(result['data']),
+                            as_attachment=True,
+                            download_name=result['filename'],
+                            mimetype=result['mimetype']
+                        )
+                    # For web service integrations, return JSON response
+                    else:
+                        return jsonify(result)
+                else:
+                    return jsonify(result), 400
+                
+            except ValueError as ve:
+                logger.error(f"Invalid export request: {str(ve)}")
+                return jsonify({'error': str(ve)}), 400
+            except Exception as e:
+                logger.error(f"Error exporting notes: {str(e)}")
                 return jsonify({'error': str(e)}), 500
 
     def preprocess_text(self, text):

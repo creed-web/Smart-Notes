@@ -35,9 +35,75 @@
                         <button id="copyNotes" class="secondary-btn" title="Copy to clipboard">
                             📋 Copy
                         </button>
-                        <button id="downloadPdf" class="secondary-btn" title="Download as PDF">
-                            📄 PDF
+                        <button id="exportMenu" class="secondary-btn" title="Export options">
+                            📤 Export ▼
                         </button>
+                        <div id="exportDropdown" class="export-dropdown" style="display: none;">
+                    <div class="export-section">
+                        <div class="export-section-title">📄 File Formats</div>
+                        <button class="export-option" data-format="pdf">
+                            <span class="export-icon">📄</span>
+                            <div class="export-details">
+                                <div class="export-name">PDF Document</div>
+                                <div class="export-desc">Professional PDF with formatting</div>
+                            </div>
+                        </button>
+                        <button class="export-option" data-format="markdown">
+                            <span class="export-icon">📝</span>
+                            <div class="export-details">
+                                <div class="export-name">Markdown</div>
+                                <div class="export-desc">Universal markdown format</div>
+                            </div>
+                        </button>
+                        <button class="export-option" data-format="html">
+                            <span class="export-icon">🌐</span>
+                            <div class="export-details">
+                                <div class="export-name">HTML Document</div>
+                                <div class="export-desc">Styled web page</div>
+                            </div>
+                        </button>
+                        <button class="export-option" data-format="txt">
+                            <span class="export-icon">📄</span>
+                            <div class="export-details">
+                                <div class="export-name">Plain Text</div>
+                                <div class="export-desc">Simple text file</div>
+                            </div>
+                        </button>
+                        <button class="export-option" data-format="json">
+                            <span class="export-icon">📊</span>
+                            <div class="export-details">
+                                <div class="export-name">JSON Data</div>
+                                <div class="export-desc">Structured data format</div>
+                            </div>
+                        </button>
+                    </div>
+                    
+                    <div class="export-section">
+                        <div class="export-section-title">🚀 Platforms</div>
+                        <button class="export-option" data-format="obsidian">
+                            <span class="export-icon">🔗</span>
+                            <div class="export-details">
+                                <div class="export-name">Obsidian</div>
+                                <div class="export-desc">Enhanced markdown for Obsidian</div>
+                            </div>
+                        </button>
+                        <button class="export-option" data-format="onenote">
+                            <span class="export-icon">📓</span>
+                            <div class="export-details">
+                                <div class="export-name">OneNote</div>
+                                <div class="export-desc">Microsoft OneNote format</div>
+                            </div>
+                        </button>
+                        <button class="export-option" data-format="evernote">
+                            <span class="export-icon">🐘</span>
+                            <div class="export-details">
+                                <div class="export-name">Evernote</div>
+                                <div class="export-desc">Evernote ENEX format</div>
+                            </div>
+                        </button>
+                        
+                        </div>
+                        </div>
                     </div>
                 </div>
                 

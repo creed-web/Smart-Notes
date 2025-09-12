@@ -9,11 +9,49 @@ class SmartNotesPopup {
 
     initializeEventListeners() {
         document.getElementById('generateNotes').addEventListener('click', () => this.generateNotes());
-        document.getElementById('copyNotes').addEventListener('click', () => this.copyNotes());
-        document.getElementById('downloadPdf').addEventListener('click', () => this.downloadPdf());
         document.getElementById('settingsLink').addEventListener('click', (e) => {
             e.preventDefault();
             this.showSettings();
+        });
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.results-header')) {
+                this.hideExportDropdown();
+            }
+        });
+    }
+    
+    initializeExportListeners() {
+        // Initialize export-related event listeners (called after results are shown)
+        const copyButton = document.getElementById('copyNotes');
+        const exportButton = document.getElementById('exportMenu');
+        
+        console.log('Initializing export listeners', { copyButton, exportButton });
+        
+        if (copyButton) {
+            copyButton.removeEventListener('click', this.copyNotesHandler);
+            this.copyNotesHandler = () => this.copyNotes();
+            copyButton.addEventListener('click', this.copyNotesHandler);
+        }
+        
+        if (exportButton) {
+            exportButton.removeEventListener('click', this.toggleExportHandler);
+            this.toggleExportHandler = () => this.toggleExportDropdown();
+            exportButton.addEventListener('click', this.toggleExportHandler);
+            console.log('Export button listener attached');
+        }
+        
+        // Handle export option clicks
+        document.querySelectorAll('.export-option').forEach(button => {
+            button.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const format = e.currentTarget.getAttribute('data-format');
+                if (!e.currentTarget.disabled) {
+                    this.exportNotes(format);
+                }
+            });
         });
     }
 
@@ -127,38 +165,138 @@ class SmartNotesPopup {
         }
     }
 
-    async downloadPdf() {
+    toggleExportDropdown() {
+        const dropdown = document.getElementById('exportDropdown');
+        const button = document.getElementById('exportMenu');
+        
+        if (dropdown.style.display === 'none' || dropdown.style.display === '') {
+            this.showExportDropdown();
+        } else {
+            this.hideExportDropdown();
+        }
+    }
+    
+    showExportDropdown() {
+        const dropdown = document.getElementById('exportDropdown');
+        const button = document.getElementById('exportMenu');
+        
+        console.log('Showing export dropdown', dropdown, button);
+        dropdown.style.display = 'block';
+        button.classList.add('active');
+    }
+    
+    hideExportDropdown() {
+        const dropdown = document.getElementById('exportDropdown');
+        const button = document.getElementById('exportMenu');
+        
+        dropdown.style.display = 'none';
+        button.classList.remove('active');
+    }
+    
+    async exportNotes(format) {
         try {
-            const response = await fetch(`${this.backendUrl}/download-pdf`, {
+            this.hideExportDropdown();
+            
+            // Show loading message
+            this.showTemporaryMessage(`Exporting to ${format.toUpperCase()}...`);
+            
+            const response = await fetch(`${this.backendUrl}/export`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
                     notes: this.currentNotes,
-                    pageInfo: this.currentPageInfo
+                    pageInfo: this.currentPageInfo,
+                    format: format,
+                    options: {}
                 })
             });
-
+            
             if (!response.ok) {
-                throw new Error('Failed to generate PDF');
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Export failed');
             }
-
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `smart-notes-${Date.now()}.pdf`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
-
-            this.showTemporaryMessage('PDF downloaded successfully!');
+            
+            // Check if this is a file download or a service response
+            const contentType = response.headers.get('content-type');
+            
+            if (contentType && (contentType.includes('application/') || contentType.includes('text/'))) {
+                // File download
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                
+                // Get filename from content-disposition header or generate one
+                const disposition = response.headers.get('content-disposition');
+                let filename = `smart_notes_${format}_${Date.now()}`;
+                
+                if (disposition && disposition.includes('filename=')) {
+                    filename = disposition.split('filename=')[1].replace(/"/g, '');
+                } else {
+                    // Add appropriate extension
+                    const extensions = {
+                        'pdf': '.pdf',
+                        'markdown': '.md',
+                        'html': '.html',
+                        'txt': '.txt',
+                        'json': '.json',
+                        'obsidian': '.md',
+                        'onenote': '.html',
+                        'evernote': '.enex'
+                    };
+                    filename += extensions[format] || '';
+                }
+                
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+                
+                this.showTemporaryMessage(`${format.toUpperCase()} exported successfully!`);
+            } else {
+                // Service response (e.g., Notion, Google Slides)
+                const data = await response.json();
+                
+                if (data.success) {
+                    if (data.url) {
+                        // Open the created resource
+                        chrome.tabs.create({ url: data.url });
+                        this.showTemporaryMessage(`Exported to ${format} successfully!`);
+                    } else {
+                        this.showTemporaryMessage(data.message || 'Export completed successfully!');
+                    }
+                } else {
+                    throw new Error(data.error || 'Export failed');
+                }
+            }
+            
         } catch (error) {
-            console.error('Failed to download PDF:', error);
-            this.showTemporaryMessage('Failed to download PDF', true);
+            console.error(`Failed to export to ${format}:`, error);
+            
+            if (error.message.includes('requires API setup') || error.message.includes('setup_required')) {
+                this.showSetupRequiredMessage(format);
+            } else {
+                this.showTemporaryMessage(`Failed to export to ${format}: ${error.message}`, true);
+            }
         }
+    }
+    
+    showSetupRequiredMessage(format) {
+        const setupMessages = {
+            'notion': 'Notion export requires API setup. Add NOTION_API_TOKEN to your backend environment.',
+            'google_slides': 'Google Slides export requires API setup. Add GOOGLE_CREDENTIALS_JSON to your backend environment.'
+        };
+        
+        const message = setupMessages[format] || `${format} export requires additional setup.`;
+        this.showTemporaryMessage(message, true, 5000);
+    }
+    
+    // Legacy PDF download method (keeping for compatibility)
+    async downloadPdf() {
+        await this.exportNotes('pdf');
     }
 
     showLoading() {
@@ -184,6 +322,9 @@ class SmartNotesPopup {
         
         // Show generate button again
         document.getElementById('generateNotes').style.display = 'flex';
+        
+        // Initialize export listeners now that the elements exist
+        this.initializeExportListeners();
         
         // Add a small delay to show the enhancement
         setTimeout(() => {
@@ -251,7 +392,7 @@ class SmartNotesPopup {
         return processedLines.join('\n');
     }
 
-    showTemporaryMessage(message, isError = false) {
+    showTemporaryMessage(message, isError = false, duration = 3000) {
         const messageEl = document.createElement('div');
         messageEl.textContent = message;
         messageEl.style.cssText = `
@@ -263,6 +404,9 @@ class SmartNotesPopup {
             border-radius: 4px;
             font-size: 12px;
             z-index: 1000;
+            max-width: 300px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
             ${isError ? 'background: #d63031; color: white;' : 'background: #00b894; color: white;'}
         `;
         
@@ -272,7 +416,7 @@ class SmartNotesPopup {
             if (document.body.contains(messageEl)) {
                 document.body.removeChild(messageEl);
             }
-        }, 3000);
+        }, duration);
     }
 
     showSettings() {
