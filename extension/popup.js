@@ -14,6 +14,11 @@ class SmartNotesPopup {
             this.showSettings();
         });
         
+        // Translation event listeners
+        document.getElementById('translatePage').addEventListener('click', () => this.showTranslateOptions());
+        document.getElementById('closeTranslate').addEventListener('click', () => this.hideTranslateOptions());
+        document.getElementById('startTranslation').addEventListener('click', () => this.translatePage());
+        
         // Close dropdown when clicking outside
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.results-header')) {
@@ -422,6 +427,295 @@ class SmartNotesPopup {
     showSettings() {
         // For now, just show an alert. Could be expanded to a settings page
         alert('Settings panel coming soon! You can configure your Hugging Face API key and other preferences.');
+    }
+    
+    showTranslateOptions() {
+        const translateOptions = document.getElementById('translateOptions');
+        translateOptions.style.display = 'block';
+    }
+    
+    hideTranslateOptions() {
+        const translateOptions = document.getElementById('translateOptions');
+        translateOptions.style.display = 'none';
+    }
+    
+    async translatePage() {
+        try {
+            const targetLanguage = document.getElementById('targetLanguage').value;
+            const translateBtn = document.getElementById('startTranslation');
+            
+            // Show loading state
+            translateBtn.disabled = true;
+            translateBtn.innerHTML = '<span class="btn-icon">⏳</span>Translating...';
+            
+            this.showTranslationStatus('Extracting page content...', 'loading');
+            
+            // Get current tab information
+            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            this.currentPageInfo = {
+                url: tab.url,
+                title: tab.title,
+                timestamp: new Date().toLocaleString()
+            };
+            
+            // Extract page content using content script
+            const [result] = await chrome.scripting.executeScript({
+                target: { tabId: tab.id },
+                function: () => {
+                    // Function to extract all text content from the entire page
+                    function extractAllTextContent() {
+                        const textContent = [];
+                        const textNodes = [];
+                        
+                        // Create a tree walker to traverse all text nodes
+                        const walker = document.createTreeWalker(
+                            document.documentElement, // Start from html element to get everything
+                            NodeFilter.SHOW_TEXT,
+                            {
+                                acceptNode: function(node) {
+                                    // Skip script, style, noscript elements
+                                    if (node.parentElement && 
+                                        ['SCRIPT', 'STYLE', 'NOSCRIPT', 'META', 'LINK', 'HEAD'].includes(node.parentElement.tagName)) {
+                                        return NodeFilter.FILTER_REJECT;
+                                    }
+                                    
+                                    // Only include nodes with meaningful text content
+                                    const text = node.nodeValue.trim();
+                                    if (text.length > 0) {
+                                        return NodeFilter.FILTER_ACCEPT;
+                                    }
+                                    return NodeFilter.FILTER_REJECT;
+                                }
+                            }
+                        );
+                        
+                        let node;
+                        while (node = walker.nextNode()) {
+                            const text = node.nodeValue.trim();
+                            if (text) {
+                                textContent.push(text);
+                                textNodes.push({
+                                    node: node,
+                                    text: text,
+                                    parent: node.parentElement ? node.parentElement.tagName : 'UNKNOWN'
+                                });
+                            }
+                        }
+                        
+                        return {
+                            fullText: textContent.join(' '),
+                            textNodes: textNodes.length,
+                            totalElements: document.querySelectorAll('*').length
+                        };
+                    }
+                    
+                    const extracted = extractAllTextContent();
+                    return {
+                        text: extracted.fullText,
+                        wordCount: extracted.fullText.split(/\s+/).length,
+                        textNodes: extracted.textNodes,
+                        totalElements: extracted.totalElements
+                    };
+                }
+            });
+            
+            if (!result || !result.result || !result.result.text) {
+                throw new Error('Failed to extract page content');
+            }
+            
+            const pageContent = result.result;
+            
+            this.showTranslationStatus(`Translating to ${targetLanguage}...`, 'loading');
+            
+            // Send content to backend for translation
+            const response = await fetch(`${this.backendUrl}/translate`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    content: pageContent.text,
+                    target_language: targetLanguage,
+                    pageInfo: this.currentPageInfo
+                })
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Translation failed');
+            }
+            
+            const data = await response.json();
+            
+            if (!data.success) {
+                throw new Error(data.error || 'Translation failed');
+            }
+            
+            this.showTranslationStatus('Applying translation to page...', 'loading');
+            
+            // Apply translation to the page
+            await chrome.scripting.executeScript({
+                target: { tabId: tab.id },
+                function: (translatedContent) => {
+                    // Enhanced function to translate the entire page
+                    function translateEntirePage(translatedText) {
+                        const textNodes = [];
+                        const originalTexts = [];
+                        
+                        // Use same traversal logic as extraction to ensure we get all nodes
+                        const walker = document.createTreeWalker(
+                            document.documentElement, // Start from html element to get everything
+                            NodeFilter.SHOW_TEXT,
+                            {
+                                acceptNode: function(node) {
+                                    // Skip script, style, noscript elements
+                                    if (node.parentElement && 
+                                        ['SCRIPT', 'STYLE', 'NOSCRIPT', 'META', 'LINK', 'HEAD'].includes(node.parentElement.tagName)) {
+                                        return NodeFilter.FILTER_REJECT;
+                                    }
+                                    
+                                    // Only include nodes with meaningful text content
+                                    const text = node.nodeValue.trim();
+                                    if (text.length > 0) {
+                                        return NodeFilter.FILTER_ACCEPT;
+                                    }
+                                    return NodeFilter.FILTER_REJECT;
+                                }
+                            }
+                        );
+                        
+                        let node;
+                        while (node = walker.nextNode()) {
+                            const text = node.nodeValue.trim();
+                            if (text) {
+                                textNodes.push(node);
+                                originalTexts.push(text);
+                            }
+                        }
+                        
+                        console.log(`Found ${textNodes.length} text nodes to translate`);
+                        
+                        // Split translated content into words for better distribution
+                        const translatedWords = translatedText.split(/\s+/).filter(word => word.trim());
+                        const originalWords = originalTexts.join(' ').split(/\s+/).filter(word => word.trim());
+                        
+                        console.log(`Original words: ${originalWords.length}, Translated words: ${translatedWords.length}`);
+                        
+                        // Create a more sophisticated mapping
+                        let wordIndex = 0;
+                        const wordRatio = translatedWords.length / originalWords.length;
+                        
+                        textNodes.forEach((node, nodeIndex) => {
+                            const originalNodeText = node.nodeValue.trim();
+                            const nodeWords = originalNodeText.split(/\s+/).filter(word => word.trim());
+                            
+                            if (nodeWords.length > 0) {
+                                // Calculate how many translated words this node should get
+                                const expectedTranslatedWords = Math.ceil(nodeWords.length * wordRatio);
+                                const endIndex = Math.min(wordIndex + expectedTranslatedWords, translatedWords.length);
+                                
+                                // Get the translated words for this node
+                                const nodeTranslatedWords = translatedWords.slice(wordIndex, endIndex);
+                                
+                                if (nodeTranslatedWords.length > 0) {
+                                    // Preserve original spacing and punctuation patterns
+                                    let newText = nodeTranslatedWords.join(' ');
+                                    
+                                    // Try to preserve some formatting patterns
+                                    if (originalNodeText.endsWith('.')) newText += '.';
+                                    else if (originalNodeText.endsWith('!')) newText += '!';
+                                    else if (originalNodeText.endsWith('?')) newText += '?';
+                                    else if (originalNodeText.endsWith(',')) newText += ',';
+                                    else if (originalNodeText.endsWith(':')) newText += ':';
+                                    else if (originalNodeText.endsWith(';')) newText += ';';
+                                    
+                                    // Preserve leading/trailing whitespace from original
+                                    const leadingWhitespace = node.nodeValue.match(/^\s*/)[0];
+                                    const trailingWhitespace = node.nodeValue.match(/\s*$/)[0];
+                                    
+                                    node.nodeValue = leadingWhitespace + newText + trailingWhitespace;
+                                    wordIndex = endIndex;
+                                }
+                            }
+                        });
+                        
+                        return textNodes.length;
+                    }
+                    
+                    // Perform the translation
+                    const translatedNodeCount = translateEntirePage(translatedContent);
+                    console.log(`Translated ${translatedNodeCount} text nodes`);
+                    
+                    // Add a visual indicator that the page has been translated
+                    const indicator = document.createElement('div');
+                    indicator.innerHTML = `🌐 Page translated (${translatedNodeCount} nodes)`;
+                    indicator.style.cssText = `
+                        position: fixed;
+                        top: 10px;
+                        right: 10px;
+                        background: #00b894;
+                        color: white;
+                        padding: 8px 12px;
+                        border-radius: 6px;
+                        font-size: 12px;
+                        z-index: 10000;
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+                        max-width: 200px;
+                    `;
+                    document.body.appendChild(indicator);
+                    
+                    // Remove indicator after 4 seconds
+                    setTimeout(() => {
+                        if (indicator.parentElement) {
+                            indicator.parentElement.removeChild(indicator);
+                        }
+                    }, 4000);
+                },
+                args: [data.translated_content]
+            });
+            
+            this.showTranslationStatus(`✓ Page translated to ${targetLanguage}!`, 'success');
+            
+            // Hide translation options after successful translation
+            setTimeout(() => {
+                this.hideTranslateOptions();
+            }, 2000);
+            
+        } catch (error) {
+            console.error('Translation error:', error);
+            this.showTranslationStatus(`✗ Translation failed: ${error.message}`, 'error');
+        } finally {
+            // Reset button state
+            const translateBtn = document.getElementById('startTranslation');
+            translateBtn.disabled = false;
+            translateBtn.innerHTML = '<span class="btn-icon">🔄</span>Start Translation';
+        }
+    }
+    
+    showTranslationStatus(message, type = 'loading') {
+        // Remove existing status if any
+        const existingStatus = document.querySelector('.translation-status');
+        if (existingStatus) {
+            existingStatus.remove();
+        }
+        
+        // Create new status element
+        const statusEl = document.createElement('div');
+        statusEl.className = `translation-status ${type}`;
+        statusEl.textContent = message;
+        
+        // Add to translate options
+        const translateOptions = document.getElementById('translateOptions');
+        translateOptions.appendChild(statusEl);
+        
+        // Auto-remove success/error messages after 5 seconds
+        if (type !== 'loading') {
+            setTimeout(() => {
+                if (statusEl.parentElement) {
+                    statusEl.remove();
+                }
+            }, 5000);
+        }
     }
 }
 

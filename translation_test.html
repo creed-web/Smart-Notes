@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Translation Feature Test - Smart Notes</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        h2 {
+            color: #34495e;
+            margin-top: 30px;
+        }
+
+        .intro {
+            background: #ecf0f1;
+            padding: 20px;
+            border-left: 5px solid #3498db;
+            margin: 20px 0;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .feature {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+
+        .feature h3 {
+            color: #495057;
+            margin-top: 0;
+        }
+
+        .cta {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            margin: 30px 0;
+        }
+
+        .demo-text {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌐 Smart Notes Extension - Translation Feature Test</h1>
+        
+        <div class="intro">
+            <p><strong>Welcome to the Smart Notes Translation Feature Test!</strong> This page contains English content that you can translate to various languages using the new translation feature in the Smart Notes browser extension.</p>
+        </div>
+
+        <h2>📋 How to Test the Translation Feature</h2>
+        <ol>
+            <li>Make sure the Smart Notes extension is installed and active</li>
+            <li>Click on the Smart Notes extension icon in your browser toolbar</li>
+            <li>Click the "🌐 Translate" button in the extension popup</li>
+            <li>Select your desired target language from the dropdown</li>
+            <li>Click "Start Translation" to translate this entire page</li>
+        </ol>
+
+        <h2>✨ Key Features of Smart Notes Translation</h2>
+        <div class="features">
+            <div class="feature">
+                <h3>🔤 Multiple Languages</h3>
+                <p>Support for 12+ languages including Spanish, French, German, Italian, Portuguese, Chinese, Japanese, Korean, Arabic, Russian, Hindi, and Dutch.</p>
+            </div>
+            
+            <div class="feature">
+                <h3>🧠 AI-Powered</h3>
+                <p>Uses advanced Hugging Face translation models for accurate and contextual translations that preserve meaning and tone.</p>
+            </div>
+            
+            <div class="feature">
+                <h3>⚡ Real-time Translation</h3>
+                <p>Translates the entire web page content directly in your browser without requiring page reloads or external applications.</p>
+            </div>
+            
+            <div class="feature">
+                <h3>🎯 Smart Processing</h3>
+                <p>Intelligently processes page content by chunking large texts and preserving the original page structure and formatting.</p>
+            </div>
+        </div>
+
+        <div class="demo-text">
+            <h3>📖 Sample Content for Translation</h3>
+            <p>This is a comprehensive paragraph that contains various elements to test translation accuracy. The Smart Notes extension can translate complex sentences, technical terms, and contextual information while maintaining readability and coherence in the target language.</p>
+            
+            <p>The translation feature works by extracting all text content from the page, sending it to our backend translation service, and then intelligently replacing the original text with translated content. This process happens seamlessly in the background while preserving the visual layout and styling of the original page.</p>
+        </div>
+
+        <h2>🚀 Benefits of Using Smart Notes Translation</h2>
+        <ul>
+            <li><strong>Accessibility:</strong> Makes web content accessible to speakers of different languages</li>
+            <li><strong>Learning:</strong> Helps language learners understand content in their target language</li>
+            <li><strong>Research:</strong> Enables researchers to access information in foreign languages</li>
+            <li><strong>Business:</strong> Facilitates international business communication and market research</li>
+            <li><strong>Travel:</strong> Assists travelers in understanding local websites and information</li>
+        </ul>
+
+        <div class="cta">
+            <h3>🌟 Ready to Test?</h3>
+            <p>Click the Smart Notes extension icon and try translating this page into your preferred language. Watch as the entire page content transforms while maintaining its visual appeal!</p>
+        </div>
+        
+        <!-- Hidden content that should also be translated -->
+        <div style="display: none;" id="hiddenContent">
+            <h3>Hidden Content Section</h3>
+            <p>This content is initially hidden but should still be translated when the translation feature runs. This tests whether the translation captures all DOM elements, not just visible ones.</p>
+        </div>
+        
+        <!-- Collapsible sections -->
+        <div class="collapsible-section">
+            <h3 onclick="toggleSection('section1')">📁 Click to expand: Advanced Features (Click me!)</h3>
+            <div id="section1" style="display: none; padding: 15px; background: #f8f9fa; border-left: 4px solid #007bff;">
+                <p>This is a collapsible section that contains additional information about the translation system. It includes details about error handling, performance optimization, and user experience enhancements.</p>
+                <ul>
+                    <li>Automatic retry mechanisms for failed translations</li>
+                    <li>Smart caching to avoid re-translating identical content</li>
+                    <li>Progressive translation for very large documents</li>
+                    <li>Language detection and automatic source language identification</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="collapsible-section">
+            <h3 onclick="toggleSection('section2')">📊 Click to expand: Technical Details (Click me!)</h3>
+            <div id="section2" style="display: none; padding: 15px; background: #f8f9fa; border-left: 4px solid #28a745;">
+                <p>The translation engine uses state-of-the-art neural machine translation models trained on millions of parallel sentences. The system implements advanced techniques like attention mechanisms and transformer architectures.</p>
+                <p>Performance metrics show 95%+ accuracy for common language pairs and real-time processing for documents up to 10,000 words. The system supports bidirectional translation and maintains semantic consistency across different languages.</p>
+            </div>
+        </div>
+
+        <h2>💡 Technical Implementation</h2>
+        <p>The translation feature is built using modern web technologies and AI models:</p>
+        <ul>
+            <li><strong>Frontend:</strong> Browser extension with React-like JavaScript components</li>
+            <li><strong>Backend:</strong> Flask API server with translation endpoints</li>
+            <li><strong>AI Models:</strong> Hugging Face Helsinki-NLP OPUS-MT translation models</li>
+            <li><strong>Processing:</strong> Intelligent text chunking and DOM manipulation</li>
+            <li><strong>UI/UX:</strong> Smooth animations and user-friendly interface</li>
+        </ul>
+
+        <p><em>This test page demonstrates the translation capabilities of the Smart Notes extension. The content above should be fully translatable into any of the supported languages while maintaining formatting and readability.</em></p>
+    </div>
+
+    <!-- Footer content that might be missed -->
+    <footer style="margin-top: 40px; padding: 20px; background: #2c3e50; color: white; text-align: center;">
+        <h4>Footer Section</h4>
+        <p>This footer content should also be translated. It contains copyright information, contact details, and additional navigation links that users might need in their preferred language.</p>
+        <p>&copy; 2025 Smart Notes Extension. All rights reserved. | Privacy Policy | Terms of Service | Contact Support</p>
+    </footer>
+
+    <script>
+        // Enhanced JavaScript for comprehensive testing
+        function toggleSection(sectionId) {
+            const section = document.getElementById(sectionId);
+            if (section.style.display === 'none') {
+                section.style.display = 'block';
+            } else {
+                section.style.display = 'none';
+            }
+        }
+        
+        // Add some dynamic content to test translation
+        document.addEventListener('DOMContentLoaded', function() {
+            const timestamp = new Date().toLocaleString();
+            const dynamicContent = document.createElement('div');
+            dynamicContent.innerHTML = `<p><small>Page loaded at: ${timestamp}</small></p>`;
+            dynamicContent.style.cssText = 'text-align: center; margin-top: 20px; color: #6c757d;';
+            document.querySelector('.container').appendChild(dynamicContent);
+            
+            // Add a button to reveal hidden content for testing
+            const revealButton = document.createElement('button');
+            revealButton.innerHTML = '👁️ Reveal Hidden Content';
+            revealButton.style.cssText = 'margin: 20px; padding: 10px 20px; background: #17a2b8; color: white; border: none; border-radius: 5px; cursor: pointer;';
+            revealButton.onclick = function() {
+                const hiddenContent = document.getElementById('hiddenContent');
+                hiddenContent.style.display = hiddenContent.style.display === 'none' ? 'block' : 'none';
+                this.innerHTML = hiddenContent.style.display === 'none' ? '👁️ Reveal Hidden Content' : '🙈 Hide Content';
+            };
+            document.querySelector('.container').appendChild(revealButton);
+            
+            // Add some content in different containers
+            const additionalContent = document.createElement('div');
+            additionalContent.innerHTML = `
+                <div style="margin-top: 30px; padding: 20px; background: linear-gradient(45deg, #ff9a9e 0%, #fecfef 50%, #fecfef 100%); border-radius: 10px;">
+                    <h3>🎨 Dynamic Content Section</h3>
+                    <p>This content was dynamically added by JavaScript and should also be translated. It demonstrates that the translation feature can handle content that wasn't part of the initial HTML structure.</p>
+                    <p>The system should traverse all DOM nodes, including those added dynamically, to ensure complete page translation coverage.</p>
+                </div>
+                <div style="margin-top: 20px; padding: 15px; background: #e9ecef; border-radius: 8px;">
+                    <h4>🔍 Translation Test Checklist:</h4>
+                    <ol>
+                        <li>Visible headings and paragraphs ✓</li>
+                        <li>Hidden content (initially not visible) ✓</li>
+                        <li>Dynamically added content ✓</li>
+                        <li>Footer content ✓</li>
+                        <li>Content in different containers ✓</li>
+                        <li>List items and structured content ✓</li>
+                    </ol>
+                </div>
+            `;
+            document.querySelector('.container').appendChild(additionalContent);
+        });
+        
+        // Add even more content after a delay to test late-loading content
+        setTimeout(() => {
+            const lateContent = document.createElement('div');
+            lateContent.innerHTML = `
+                <div style="margin-top: 20px; padding: 15px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 6px;">
+                    <h4>⏰ Late-Loading Content</h4>
+                    <p>This content was added 2 seconds after page load to simulate late-loading or dynamically inserted content. A comprehensive translation system should be able to handle this type of content as well.</p>
+                </div>
+            `;
+            document.querySelector('.container').appendChild(lateContent);
+        }, 2000);
+    </script>
+</body>
+</html>

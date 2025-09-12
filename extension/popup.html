@@ -14,10 +14,44 @@
         </div>
         
         <div class="content">
-            <button id="generateNotes" class="primary-btn">
-                <span class="btn-icon">🧠</span>
-                Generate Structured Notes
-            </button>
+            <div class="action-row">
+                <button id="generateNotes" class="primary-btn">
+                    <span class="btn-icon">🧠</span>
+                    Generate Structured Notes
+                </button>
+                <button id="translatePage" class="secondary-action-btn" title="Translate page">
+                    <span class="btn-icon">🌐</span>
+                    Translate
+                </button>
+            </div>
+            
+            <div id="translateOptions" class="translate-options" style="display: none;">
+                <div class="translate-header">
+                    <h4>🌐 Translate Page</h4>
+                    <button id="closeTranslate" class="close-btn">×</button>
+                </div>
+                <div class="language-selector">
+                    <label for="targetLanguage">Translate to:</label>
+                    <select id="targetLanguage" class="language-select">
+                        <option value="spanish">Spanish (Español)</option>
+                        <option value="french">French (Français)</option>
+                        <option value="german">German (Deutsch)</option>
+                        <option value="italian">Italian (Italiano)</option>
+                        <option value="portuguese">Portuguese (Português)</option>
+                        <option value="chinese">Chinese (中文)</option>
+                        <option value="japanese">Japanese (日本語)</option>
+                        <option value="korean">Korean (한국어)</option>
+                        <option value="arabic">Arabic (العربية)</option>
+                        <option value="russian">Russian (Русский)</option>
+                        <option value="hindi">Hindi (हिन्दी)</option>
+                        <option value="dutch">Dutch (Nederlands)</option>
+                    </select>
+                </div>
+                <button id="startTranslation" class="translate-btn">
+                    <span class="btn-icon">🔄</span>
+                    Start Translation
+                </button>
+            </div>
             
             <div id="loading" class="loading" style="display: none;">
                 <div class="spinner"></div>

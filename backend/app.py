@@ -193,6 +193,66 @@ class SmartNotesApp:
             except Exception as e:
                 logger.error(f"Error exporting notes: {str(e)}")
                 return jsonify({'error': str(e)}), 500
+        
+        @self.app.route('/translate', methods=['POST'])
+        def translate_page():
+            """Translate web page content to specified language"""
+            try:
+                data = request.json
+                if not data or 'content' not in data or 'target_language' not in data:
+                    return jsonify({'error': 'Missing content or target_language in request'}), 400
+                
+                content = data['content']
+                target_language = data['target_language']
+                source_language = data.get('source_language', 'auto')
+                page_info = data.get('pageInfo', {})
+                
+                logger.info(f"Translating content to {target_language}")
+                
+                # Validate content
+                if len(content.strip()) < 10:
+                    return jsonify({'error': 'Content too short for translation'}), 400
+                
+                # Preprocess content for translation
+                processed_content = self.preprocess_text_for_translation(content)
+                
+                # Translate the content
+                translated_content = self.translate_content(processed_content, target_language, source_language)
+                
+                # Prepare response
+                response = {
+                    'success': True,
+                    'translated_content': translated_content,
+                    'source_language': source_language,
+                    'target_language': target_language,
+                    'metadata': {
+                        'source_url': page_info.get('url', 'Unknown'),
+                        'source_title': page_info.get('title', 'Web Page'),
+                        'original_length': len(content),
+                        'translated_length': len(translated_content),
+                        'translated_at': datetime.utcnow().isoformat()
+                    }
+                }
+                
+                logger.info(f"Successfully translated content to {target_language}")
+                return jsonify(response)
+                
+            except Exception as e:
+                logger.error(f"Error translating content: {str(e)}")
+                return jsonify({'error': str(e)}), 500
+        
+        @self.app.route('/supported-languages', methods=['GET'])
+        def get_supported_languages():
+            """Get list of supported translation languages"""
+            try:
+                languages = self.get_supported_translation_languages()
+                return jsonify({
+                    'success': True,
+                    'languages': languages
+                })
+            except Exception as e:
+                logger.error(f"Error getting supported languages: {str(e)}")
+                return jsonify({'error': str(e)}), 500
 
     def preprocess_text(self, text):
         """Clean and preprocess text content"""
@@ -824,6 +884,160 @@ Notes to organize: {combined_content}"""
                     content.append(Spacer(1, 6))
         
         return content
+    
+    def preprocess_text_for_translation(self, text):
+        """Preprocess text for translation to preserve structure"""
+        # Keep the original structure but clean up for better translation
+        text = re.sub(r'\s+', ' ', text).strip()
+        
+        # Preserve line breaks for better structure
+        text = re.sub(r'\n+', '\n', text)
+        
+        # Don't remove URLs completely as they might be important for context
+        # Just normalize them
+        text = re.sub(r'http[s]?://[^\s]+', '[URL]', text)
+        
+        return text.strip()
+    
+    def translate_content(self, content, target_language, source_language="auto"):
+        """Translate content using Hugging Face translation models"""
+        if not self.HF_TOKEN:
+            raise ValueError("Hugging Face API token not configured")
+        
+        try:
+            # Split content into chunks if it's too long
+            chunks = self.chunk_text_for_translation(content)
+            translated_chunks = []
+            
+            for chunk in chunks:
+                translated_chunk = self.translate_chunk(chunk, target_language, source_language)
+                translated_chunks.append(translated_chunk)
+            
+            return ' '.join(translated_chunks)
+            
+        except Exception as e:
+            logger.error(f"Translation failed: {str(e)}")
+            raise ValueError(f"Translation failed: {str(e)}")
+    
+    def chunk_text_for_translation(self, text, max_chars=1000):
+        """Split text into chunks for translation"""
+        if len(text) <= max_chars:
+            return [text]
+        
+        chunks = []
+        sentences = sent_tokenize(text)
+        current_chunk = ""
+        
+        for sentence in sentences:
+            if len(current_chunk + sentence) <= max_chars:
+                current_chunk += sentence + " "
+            else:
+                if current_chunk.strip():
+                    chunks.append(current_chunk.strip())
+                current_chunk = sentence + " "
+        
+        if current_chunk.strip():
+            chunks.append(current_chunk.strip())
+        
+        return chunks
+    
+    def translate_chunk(self, text, target_language, source_language="auto"):
+        """Translate a single chunk using Hugging Face API"""
+        # Map language codes to appropriate models
+        language_models = {
+            'spanish': 'Helsinki-NLP/opus-mt-en-es',
+            'french': 'Helsinki-NLP/opus-mt-en-fr',
+            'german': 'Helsinki-NLP/opus-mt-en-de',
+            'italian': 'Helsinki-NLP/opus-mt-en-it',
+            'portuguese': 'Helsinki-NLP/opus-mt-en-pt',
+            'dutch': 'Helsinki-NLP/opus-mt-en-nl',
+            'chinese': 'Helsinki-NLP/opus-mt-en-zh',
+            'japanese': 'Helsinki-NLP/opus-mt-en-jap',
+            'korean': 'Helsinki-NLP/opus-mt-en-ko',
+            'arabic': 'Helsinki-NLP/opus-mt-en-ar',
+            'russian': 'Helsinki-NLP/opus-mt-en-ru',
+            'hindi': 'Helsinki-NLP/opus-mt-en-hi'
+        }
+        
+        model_name = language_models.get(target_language.lower(), 'Helsinki-NLP/opus-mt-en-es')
+        translation_api_url = f"https://api-inference.huggingface.co/models/{model_name}"
+        
+        headers = {"Authorization": f"Bearer {self.HF_TOKEN}"}
+        
+        payload = {
+            "inputs": text
+        }
+        
+        try:
+            response = requests.post(translation_api_url, headers=headers, json=payload, timeout=30)
+            response.raise_for_status()
+            
+            result = response.json()
+            
+            if isinstance(result, list) and len(result) > 0:
+                if 'translation_text' in result[0]:
+                    return result[0]['translation_text']
+                elif 'generated_text' in result[0]:
+                    return result[0]['generated_text']
+            
+            # Fallback: try using the general model with prompting
+            return self.translate_with_general_model(text, target_language)
+            
+        except requests.exceptions.RequestException as e:
+            logger.warning(f"Translation API request failed: {str(e)}")
+            # Fallback to general model
+            return self.translate_with_general_model(text, target_language)
+    
+    def translate_with_general_model(self, text, target_language):
+        """Fallback translation using general language model"""
+        prompt = f"Translate the following text to {target_language}:\n\n{text}\n\nTranslation:"
+        
+        headers = {"Authorization": f"Bearer {self.HF_TOKEN}"}
+        
+        payload = {
+            "inputs": prompt,
+            "parameters": {
+                "max_length": len(text) * 2,  # Allow for expansion
+                "min_length": len(text) // 2,
+                "do_sample": False,
+                "temperature": 0.3
+            }
+        }
+        
+        try:
+            response = requests.post(self.HF_API_URL, headers=headers, json=payload, timeout=30)
+            response.raise_for_status()
+            
+            result = response.json()
+            if isinstance(result, list) and len(result) > 0:
+                translated = result[0].get('generated_text', '').strip()
+                # Remove the prompt from the response
+                if 'Translation:' in translated:
+                    translated = translated.split('Translation:')[-1].strip()
+                return translated
+            
+            return text  # Return original if translation fails
+            
+        except Exception as e:
+            logger.error(f"General model translation failed: {str(e)}")
+            return text  # Return original text as fallback
+    
+    def get_supported_translation_languages(self):
+        """Get list of supported translation languages"""
+        return [
+            {"code": "spanish", "name": "Spanish", "native": "Español"},
+            {"code": "french", "name": "French", "native": "Français"},
+            {"code": "german", "name": "German", "native": "Deutsch"},
+            {"code": "italian", "name": "Italian", "native": "Italiano"},
+            {"code": "portuguese", "name": "Portuguese", "native": "Português"},
+            {"code": "dutch", "name": "Dutch", "native": "Nederlands"},
+            {"code": "chinese", "name": "Chinese (Simplified)", "native": "中文"},
+            {"code": "japanese", "name": "Japanese", "native": "日本語"},
+            {"code": "korean", "name": "Korean", "native": "한국어"},
+            {"code": "arabic", "name": "Arabic", "native": "العربية"},
+            {"code": "russian", "name": "Russian", "native": "Русский"},
+            {"code": "hindi", "name": "Hindi", "native": "हिन्दी"}
+        ]
 
 def create_app():
     """Create and configure Flask application"""
