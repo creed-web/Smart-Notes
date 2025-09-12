@@ -173,8 +173,9 @@ class SmartNotesPopup {
         document.getElementById('error').style.display = 'none';
         document.getElementById('results').style.display = 'block';
         
-        // Display the notes
+        // Display the notes with animation
         const notesContent = document.getElementById('notesContent');
+        notesContent.classList.add('loading-animation');
         notesContent.innerHTML = this.formatNotes(this.currentNotes);
         
         // Display page info
@@ -183,6 +184,11 @@ class SmartNotesPopup {
         
         // Show generate button again
         document.getElementById('generateNotes').style.display = 'flex';
+        
+        // Add a small delay to show the enhancement
+        setTimeout(() => {
+            this.showTemporaryMessage('✨ Enhanced structured notes generated!');
+        }, 500);
     }
 
     showError(message) {
@@ -195,9 +201,54 @@ class SmartNotesPopup {
     }
 
     formatNotes(notes) {
-        // Convert notes to HTML with proper formatting
-        const paragraphs = notes.split('\n').filter(p => p.trim());
-        return paragraphs.map(p => `<p>${p.trim()}</p>`).join('');
+        // Convert markdown-style notes to HTML with proper formatting
+        return this.convertMarkdownToHTML(notes);
+    }
+    
+    convertMarkdownToHTML(markdown) {
+        let html = markdown;
+        
+        // Convert headers
+        html = html.replace(/^### (.*$)/gim, '<h3 class="note-h3">$1</h3>');
+        html = html.replace(/^## (.*$)/gim, '<h2 class="note-h2">$1</h2>');
+        html = html.replace(/^# (.*$)/gim, '<h1 class="note-h1">$1</h1>');
+        
+        // Convert bold text
+        html = html.replace(/\*\*(.*?)\*\*/g, '<strong class="note-bold">$1</strong>');
+        
+        // Convert bullet points with icons
+        html = html.replace(/^- (.*$)/gim, '<li class="note-bullet">$1</li>');
+        html = html.replace(/^🔑 (.*$)/gim, '<li class="note-key">🔑 $1</li>');
+        html = html.replace(/^✅ (.*$)/gim, '<li class="note-action">✅ $1</li>');
+        html = html.replace(/^⚠️ (.*$)/gim, '<li class="note-warning">⚠️ $1</li>');
+        html = html.replace(/^✨ (.*$)/gim, '<li class="note-benefit">✨ $1</li>');
+        html = html.replace(/^❌ (.*$)/gim, '<li class="note-problem">❌ $1</li>');
+        
+        // Convert code blocks
+        html = html.replace(/```([\s\S]*?)```/g, '<pre class="note-code">$1</pre>');
+        
+        // Convert horizontal rules
+        html = html.replace(/^---$/gim, '<hr class="note-divider">');
+        
+        // Convert emphasis text
+        html = html.replace(/\*(.*?)\*/g, '<em class="note-emphasis">$1</em>');
+        
+        // Wrap consecutive list items in ul tags
+        html = html.replace(/((<li[^>]*>.*?<\/li>\s*)+)/g, '<ul class="note-list">$1</ul>');
+        
+        // Convert remaining paragraphs
+        const lines = html.split('\n');
+        const processedLines = lines.map(line => {
+            const trimmed = line.trim();
+            if (!trimmed) return '<br>';
+            if (trimmed.startsWith('<') && trimmed.endsWith('>')) return line;
+            if (!trimmed.match(/^<(h[1-6]|li|ul|pre|hr)/)) {
+                return `<p class="note-paragraph">${trimmed}</p>`;
+            }
+            return line;
+        });
+        
+        return processedLines.join('\n');
     }
 
     showTemporaryMessage(message, isError = false) {
