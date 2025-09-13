@@ -41,7 +41,11 @@ logger = logging.getLogger(__name__)
 class SmartNotesApp:
     def __init__(self):
         self.app = Flask(__name__)
-        CORS(self.app)  # Enable CORS for Chrome extension
+        # Enhanced CORS configuration for Chrome extensions
+        CORS(self.app, 
+             origins=["chrome-extension://*", "http://localhost:*", "https://localhost:*"],
+             allow_headers=["Content-Type", "Authorization"],
+             methods=["GET", "POST", "OPTIONS"])
         
         # Configuration
         self.HF_API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-small"
@@ -198,26 +202,44 @@ class SmartNotesApp:
         def translate_page():
             """Translate web page content to specified language"""
             try:
+                # Check if API token is configured
+                if not self.HF_TOKEN:
+                    logger.error("Hugging Face API token not configured")
+                    return jsonify({
+                        'success': False,
+                        'error': 'Translation service not configured. Please set HUGGINGFACE_API_TOKEN environment variable. Get your token at https://huggingface.co/settings/tokens'
+                    }), 500
+                
                 data = request.json
                 if not data or 'content' not in data or 'target_language' not in data:
-                    return jsonify({'error': 'Missing content or target_language in request'}), 400
+                    return jsonify({
+                        'success': False,
+                        'error': 'Missing content or target_language in request'
+                    }), 400
                 
                 content = data['content']
                 target_language = data['target_language']
                 source_language = data.get('source_language', 'auto')
                 page_info = data.get('pageInfo', {})
                 
-                logger.info(f"Translating content to {target_language}")
+                logger.info(f"Translating content to {target_language} (length: {len(content)} chars)")
                 
                 # Validate content
                 if len(content.strip()) < 10:
-                    return jsonify({'error': 'Content too short for translation'}), 400
+                    return jsonify({
+                        'success': False,
+                        'error': 'Content too short for translation (minimum 10 characters required)'
+                    }), 400
                 
                 # Preprocess content for translation
                 processed_content = self.preprocess_text_for_translation(content)
+                logger.info(f"Processed content length: {len(processed_content)} chars")
                 
-                # Translate the content
-                translated_content = self.translate_content(processed_content, target_language, source_language)
+                # Translate the content with retry logic
+                translated_content = self.translate_content_with_retry(processed_content, target_language, source_language)
+                
+                if not translated_content or translated_content == processed_content:
+                    logger.warning("Translation may have failed - content unchanged")
                 
                 # Prepare response
                 response = {
@@ -229,6 +251,7 @@ class SmartNotesApp:
                         'source_url': page_info.get('url', 'Unknown'),
                         'source_title': page_info.get('title', 'Web Page'),
                         'original_length': len(content),
+                        'processed_length': len(processed_content),
                         'translated_length': len(translated_content),
                         'translated_at': datetime.utcnow().isoformat()
                     }
@@ -237,9 +260,24 @@ class SmartNotesApp:
                 logger.info(f"Successfully translated content to {target_language}")
                 return jsonify(response)
                 
+            except ValueError as ve:
+                logger.error(f"Translation validation error: {str(ve)}")
+                return jsonify({
+                    'success': False,
+                    'error': f'Translation error: {str(ve)}'
+                }), 400
+            except requests.exceptions.RequestException as re:
+                logger.error(f"Network error during translation: {str(re)}")
+                return jsonify({
+                    'success': False,
+                    'error': f'Network error: Unable to connect to translation service. Please check your internet connection.'
+                }), 503
             except Exception as e:
-                logger.error(f"Error translating content: {str(e)}")
-                return jsonify({'error': str(e)}), 500
+                logger.error(f"Unexpected error translating content: {str(e)}", exc_info=True)
+                return jsonify({
+                    'success': False,
+                    'error': f'Translation service error: {str(e)}'
+                }), 500
         
         @self.app.route('/supported-languages', methods=['GET'])
         def get_supported_languages():
@@ -943,6 +981,7 @@ Notes to organize: {combined_content}"""
     
     def translate_chunk(self, text, target_language, source_language="auto"):
         """Translate a single chunk using Hugging Face API"""
+        import time
         # Map language codes to appropriate models
         language_models = {
             'spanish': 'Helsinki-NLP/opus-mt-en-es',
@@ -970,9 +1009,22 @@ Notes to organize: {combined_content}"""
         
         try:
             response = requests.post(translation_api_url, headers=headers, json=payload, timeout=30)
+            
+            # Handle different response status codes
+            if response.status_code == 503:
+                # Model is loading, wait and retry
+                logger.info(f"Model {model_name} is loading, waiting...")
+                time.sleep(20)  # Wait for model to load
+                response = requests.post(translation_api_url, headers=headers, json=payload, timeout=30)
+            
             response.raise_for_status()
             
             result = response.json()
+            
+            # Handle error responses from HuggingFace
+            if isinstance(result, dict) and 'error' in result:
+                logger.warning(f"HuggingFace API error: {result['error']}")
+                return self.translate_with_general_model(text, target_language)
             
             if isinstance(result, list) and len(result) > 0:
                 if 'translation_text' in result[0]:
@@ -1021,6 +1073,51 @@ Notes to organize: {combined_content}"""
         except Exception as e:
             logger.error(f"General model translation failed: {str(e)}")
             return text  # Return original text as fallback
+    
+    def translate_content_with_retry(self, content, target_language, source_language="auto", max_retries=3):
+        """Translate content with retry logic and better error handling"""
+        import time
+        
+        last_error = None
+        
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"Translation attempt {attempt + 1}/{max_retries}")
+                translated = self.translate_content(content, target_language, source_language)
+                
+                # Validate translation result
+                if translated and translated.strip() and translated != content:
+                    logger.info(f"Translation successful on attempt {attempt + 1}")
+                    return translated
+                else:
+                    logger.warning(f"Translation attempt {attempt + 1} returned empty or unchanged content")
+                    if attempt < max_retries - 1:
+                        time.sleep(1)  # Wait before retry
+                        continue
+                    
+            except requests.exceptions.Timeout as e:
+                last_error = f"Request timeout: {str(e)}"
+                logger.warning(f"Translation attempt {attempt + 1} timed out: {e}")
+            except requests.exceptions.ConnectionError as e:
+                last_error = f"Connection error: {str(e)}"
+                logger.warning(f"Translation attempt {attempt + 1} connection failed: {e}")
+            except requests.exceptions.RequestException as e:
+                last_error = f"Request failed: {str(e)}"
+                logger.warning(f"Translation attempt {attempt + 1} request failed: {e}")
+            except Exception as e:
+                last_error = f"Translation error: {str(e)}"
+                logger.warning(f"Translation attempt {attempt + 1} failed: {e}")
+            
+            # Wait before retry (exponential backoff)
+            if attempt < max_retries - 1:
+                wait_time = (attempt + 1) * 2  # 2, 4, 6 seconds
+                logger.info(f"Waiting {wait_time} seconds before retry...")
+                time.sleep(wait_time)
+        
+        # All attempts failed
+        error_msg = last_error or "Translation failed after all attempts"
+        logger.error(f"Translation failed after {max_retries} attempts: {error_msg}")
+        raise ValueError(error_msg)
     
     def get_supported_translation_languages(self):
         """Get list of supported translation languages"""

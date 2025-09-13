@@ -556,8 +556,21 @@ class SmartNotesPopup {
             });
             
             if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Translation failed');
+                let errorMessage = 'Translation failed';
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.error || 'Translation failed';
+                } catch (parseError) {
+                    console.error('Failed to parse error response:', parseError);
+                    if (response.status === 500) {
+                        errorMessage = 'Translation service error. Please check if the backend server is properly configured.';
+                    } else if (response.status === 503) {
+                        errorMessage = 'Translation service unavailable. Please check your internet connection.';
+                    } else {
+                        errorMessage = `Translation failed (HTTP ${response.status})`;
+                    }
+                }
+                throw new Error(errorMessage);
             }
             
             const data = await response.json();
