@@ -713,6 +713,242 @@ body {
     border: 1px solid #bee5eb;
 }
 
+/* Read Aloud UI Styles */
+.read-aloud-options {
+    margin-top: 15px;
+    padding: 15px;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    animation: slideDown 0.3s ease-out;
+}
+
+.read-aloud-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.read-aloud-header h4 {
+    margin: 0;
+    color: #333;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.voice-controls {
+    margin-bottom: 15px;
+}
+
+.voice-selector {
+    margin-bottom: 15px;
+}
+
+.voice-selector label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #495057;
+}
+
+.voice-select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    font-size: 12px;
+    color: #495057;
+    background: white;
+    cursor: pointer;
+    transition: border-color 0.2s ease;
+}
+
+.voice-select:focus {
+    outline: none;
+    border-color: #e74c3c;
+    box-shadow: 0 0 0 2px rgba(231, 76, 60, 0.1);
+}
+
+.speech-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.control-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.control-group label {
+    min-width: 50px;
+    font-size: 11px;
+    font-weight: 500;
+    color: #495057;
+}
+
+.control-slider {
+    flex: 1;
+    height: 6px;
+    background: #e9ecef;
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+}
+
+.control-slider::-webkit-slider-thumb {
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    background: #e74c3c;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.control-slider::-webkit-slider-thumb:hover {
+    background: #c0392b;
+    transform: scale(1.1);
+}
+
+.control-group span {
+    min-width: 35px;
+    font-size: 11px;
+    font-weight: 500;
+    color: #6c757d;
+    text-align: right;
+}
+
+.playback-controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 15px;
+}
+
+.control-btn {
+    flex: 1;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+.play-btn {
+    background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+    color: white;
+}
+
+.play-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(46, 204, 113, 0.3);
+}
+
+.pause-btn {
+    background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+    color: white;
+}
+
+.pause-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(243, 156, 18, 0.3);
+}
+
+.stop-btn {
+    background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+    color: white;
+}
+
+.stop-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(231, 76, 60, 0.3);
+}
+
+.control-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.control-btn .btn-icon {
+    font-size: 12px;
+}
+
+.reading-progress {
+    margin-top: 10px;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 6px;
+    background: #e9ecef;
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+    width: 0%;
+    transition: width 0.3s ease;
+    border-radius: 3px;
+}
+
+.progress-text {
+    text-align: center;
+}
+
+.progress-text span {
+    font-size: 11px;
+    color: #6c757d;
+    font-style: italic;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: inline-block;
+}
+
+/* Read aloud status messages */
+.speech-status {
+    margin-top: 10px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    text-align: center;
+}
+
+.speech-status.speaking {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.speech-status.paused {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+}
+
+.speech-status.error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
 /* Responsive adjustments */
 @media (max-width: 450px) {
     .action-row {
@@ -722,5 +958,27 @@ body {
     .secondary-action-btn {
         flex-direction: row;
         min-width: auto;
+    }
+    
+    .speech-controls {
+        gap: 8px;
+    }
+    
+    .control-group {
+        gap: 8px;
+    }
+    
+    .control-group label {
+        min-width: 45px;
+        font-size: 10px;
+    }
+    
+    .playback-controls {
+        gap: 6px;
+    }
+    
+    .control-btn {
+        padding: 6px 8px;
+        font-size: 10px;
     }
 }

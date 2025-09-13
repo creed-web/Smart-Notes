@@ -19,6 +19,21 @@ class SmartNotesPopup {
         document.getElementById('closeTranslate').addEventListener('click', () => this.hideTranslateOptions());
         document.getElementById('startTranslation').addEventListener('click', () => this.translatePage());
         
+        // Read Aloud event listeners
+        document.getElementById('readAloudPage').addEventListener('click', () => this.showReadAloudOptions());
+        document.getElementById('closeReadAloud').addEventListener('click', () => this.hideReadAloudOptions());
+        document.getElementById('playButton').addEventListener('click', () => this.startReading());
+        document.getElementById('pauseButton').addEventListener('click', () => this.pauseReading());
+        document.getElementById('stopButton').addEventListener('click', () => this.stopReading());
+        
+        // Voice and control listeners
+        document.getElementById('speechRate').addEventListener('input', (e) => this.updateRateDisplay(e.target.value));
+        document.getElementById('speechPitch').addEventListener('input', (e) => this.updatePitchDisplay(e.target.value));
+        document.getElementById('speechVolume').addEventListener('input', (e) => this.updateVolumeDisplay(e.target.value));
+        
+        // Initialize speech synthesis
+        this.initializeSpeechSynthesis();
+        
         // Close dropdown when clicking outside
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.results-header')) {
@@ -676,6 +691,12 @@ class SmartNotesPopup {
             
             this.showTranslationStatus(`✓ Page translated to ${targetLanguage}!`, 'success');
             
+            // Update current language for read aloud feature
+            this.currentLanguage = this.getLanguageCodeFromName(targetLanguage);
+            
+            // Show read aloud option for translated content
+            this.showTemporaryMessage('🔊 Now you can use Read Aloud in ' + targetLanguage + '!', false, 4000);
+            
             // Hide translation options after successful translation
             setTimeout(() => {
                 this.hideTranslateOptions();
@@ -715,6 +736,435 @@ class SmartNotesPopup {
                     statusEl.remove();
                 }
             }, 5000);
+        }
+    }
+    
+    // ============ READ ALOUD FUNCTIONALITY ============
+    
+    initializeSpeechSynthesis() {
+        // Initialize speech synthesis variables
+        this.speechSynthesis = window.speechSynthesis;
+        this.currentUtterance = null;
+        this.speechQueue = [];
+        this.isReading = false;
+        this.isPaused = false;
+        this.currentChunkIndex = 0;
+        this.currentLanguage = 'en';
+        this.pageTextChunks = [];
+        
+        // Load available voices
+        this.loadVoices();
+        
+        // Update voices when they change (some browsers load voices asynchronously)
+        if (this.speechSynthesis.onvoiceschanged !== undefined) {
+            this.speechSynthesis.onvoiceschanged = () => this.loadVoices();
+        }
+    }
+    
+    loadVoices() {
+        const voices = this.speechSynthesis.getVoices();
+        const voiceSelect = document.getElementById('voiceSelect');
+        
+        // Clear existing options
+        voiceSelect.innerHTML = '';
+        
+        if (voices.length === 0) {
+            voiceSelect.innerHTML = '<option value="">Loading voices...</option>';
+            return;
+        }
+        
+        // Group voices by language
+        const voicesByLanguage = {};
+        voices.forEach((voice, index) => {
+            const lang = voice.lang.split('-')[0]; // Get base language code
+            if (!voicesByLanguage[lang]) {
+                voicesByLanguage[lang] = [];
+            }
+            voicesByLanguage[lang].push({ voice, index });
+        });
+        
+        // Add default option
+        voiceSelect.innerHTML = '<option value="">Auto (Browser Default)</option>';
+        
+        // Add voices grouped by language
+        Object.keys(voicesByLanguage).sort().forEach(lang => {
+            const langName = this.getLanguageName(lang);
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = langName;
+            
+            voicesByLanguage[lang].forEach(({ voice, index }) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = `${voice.name} (${voice.lang})`;
+                if (voice.default) {
+                    option.textContent += ' - Default';
+                }
+                optgroup.appendChild(option);
+            });
+            
+            voiceSelect.appendChild(optgroup);
+        });
+        
+        console.log(`Loaded ${voices.length} voices`);
+    }
+    
+    getLanguageName(langCode) {
+        const languageNames = {
+            'en': 'English',
+            'es': 'Spanish',
+            'fr': 'French',
+            'de': 'German',
+            'it': 'Italian',
+            'pt': 'Portuguese',
+            'nl': 'Dutch',
+            'zh': 'Chinese',
+            'ja': 'Japanese',
+            'ko': 'Korean',
+            'ar': 'Arabic',
+            'ru': 'Russian',
+            'hi': 'Hindi'
+        };
+        return languageNames[langCode] || langCode.toUpperCase();
+    }
+    
+    getLanguageCodeFromName(languageName) {
+        const languageCodes = {
+            'spanish': 'es',
+            'french': 'fr',
+            'german': 'de',
+            'italian': 'it',
+            'portuguese': 'pt',
+            'dutch': 'nl',
+            'chinese': 'zh',
+            'japanese': 'ja',
+            'korean': 'ko',
+            'arabic': 'ar',
+            'russian': 'ru',
+            'hindi': 'hi'
+        };
+        return languageCodes[languageName.toLowerCase()] || 'en';
+    }
+    
+    showReadAloudOptions() {
+        const readAloudOptions = document.getElementById('readAloudOptions');
+        readAloudOptions.style.display = 'block';
+        
+        // Refresh voices in case they weren't loaded initially
+        this.loadVoices();
+    }
+    
+    hideReadAloudOptions() {
+        const readAloudOptions = document.getElementById('readAloudOptions');
+        readAloudOptions.style.display = 'none';
+        
+        // Stop reading if currently active
+        if (this.isReading) {
+            this.stopReading();
+        }
+    }
+    
+    updateRateDisplay(value) {
+        document.getElementById('rateValue').textContent = value + 'x';
+    }
+    
+    updatePitchDisplay(value) {
+        document.getElementById('pitchValue').textContent = value;
+    }
+    
+    updateVolumeDisplay(value) {
+        const percentage = Math.round(value * 100);
+        document.getElementById('volumeValue').textContent = percentage + '%';
+    }
+    
+    async startReading() {
+        try {
+            if (this.isPaused && this.speechSynthesis.paused) {
+                // Resume if paused
+                this.speechSynthesis.resume();
+                this.isPaused = false;
+                this.updatePlaybackControls('playing');
+                this.showSpeechStatus('Resuming reading...', 'speaking');
+                return;
+            }
+            
+            // Extract page content for reading
+            this.showSpeechStatus('Extracting page content...', 'speaking');
+            
+            // Get current tab and extract content
+            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            
+            const [result] = await chrome.scripting.executeScript({
+                target: { tabId: tab.id },
+                function: () => {
+                    // Enhanced content extraction for reading
+                    function extractReadableContent() {
+                        const readableTexts = [];
+                        
+                        // Create tree walker to get all text nodes
+                        const walker = document.createTreeWalker(
+                            document.documentElement,
+                            NodeFilter.SHOW_TEXT,
+                            {
+                                acceptNode: function(node) {
+                                    // Skip technical elements
+                                    if (node.parentElement && 
+                                        ['SCRIPT', 'STYLE', 'NOSCRIPT', 'META', 'LINK', 'HEAD'].includes(node.parentElement.tagName)) {
+                                        return NodeFilter.FILTER_REJECT;
+                                    }
+                                    
+                                    // Only meaningful content
+                                    const text = node.nodeValue.trim();
+                                    if (text.length > 5) { // Minimum length for readable content
+                                        return NodeFilter.FILTER_ACCEPT;
+                                    }
+                                    return NodeFilter.FILTER_REJECT;
+                                }
+                            }
+                        );
+                        
+                        let node;
+                        while (node = walker.nextNode()) {
+                            const text = node.nodeValue.trim();
+                            if (text) {
+                                readableTexts.push(text);
+                            }
+                        }
+                        
+                        // Join with periods to create natural reading flow
+                        const fullText = readableTexts.join('. ').replace(/\.\.+/g, '.');
+                        
+                        return {
+                            text: fullText,
+                            chunks: readableTexts.length,
+                            language: document.documentElement.lang || 'en'
+                        };
+                    }
+                    
+                    return extractReadableContent();
+                }
+            });
+            
+            if (!result || !result.result || !result.result.text) {
+                throw new Error('No readable content found on this page');
+            }
+            
+            const pageData = result.result;
+            this.currentLanguage = pageData.language;
+            
+            // Split content into manageable chunks (about 200 characters each)
+            this.pageTextChunks = this.splitTextIntoChunks(pageData.text, 200);
+            
+            console.log(`Prepared ${this.pageTextChunks.length} text chunks for reading`);
+            
+            // Auto-select appropriate voice based on page language
+            this.selectVoiceForLanguage(this.currentLanguage);
+            
+            // Start reading from the beginning
+            this.currentChunkIndex = 0;
+            this.isReading = true;
+            this.readNextChunk();
+            
+            this.updatePlaybackControls('playing');
+            
+        } catch (error) {
+            console.error('Error starting read aloud:', error);
+            this.showSpeechStatus(`Error: ${error.message}`, 'error');
+        }
+    }
+    
+    splitTextIntoChunks(text, maxLength) {
+        const chunks = [];
+        const sentences = text.split(/[\.!?]+/).filter(s => s.trim());
+        let currentChunk = '';
+        
+        for (const sentence of sentences) {
+            const trimmedSentence = sentence.trim();
+            if (!trimmedSentence) continue;
+            
+            if (currentChunk.length + trimmedSentence.length + 2 <= maxLength) {
+                currentChunk += (currentChunk ? '. ' : '') + trimmedSentence;
+            } else {
+                if (currentChunk) {
+                    chunks.push(currentChunk + '.');
+                }
+                currentChunk = trimmedSentence;
+            }
+        }
+        
+        if (currentChunk) {
+            chunks.push(currentChunk + '.');
+        }
+        
+        return chunks.filter(chunk => chunk.trim().length > 5);
+    }
+    
+    selectVoiceForLanguage(language) {
+        const voices = this.speechSynthesis.getVoices();
+        const voiceSelect = document.getElementById('voiceSelect');
+        
+        // Try to find a voice that matches the page language
+        let bestVoice = null;
+        let exactMatch = null;
+        
+        voices.forEach((voice, index) => {
+            if (voice.lang.startsWith(language)) {
+                if (voice.lang === language) {
+                    exactMatch = index;
+                } else if (!bestVoice) {
+                    bestVoice = index;
+                }
+            }
+        });
+        
+        const selectedVoiceIndex = exactMatch !== null ? exactMatch : bestVoice;
+        
+        if (selectedVoiceIndex !== null) {
+            voiceSelect.value = selectedVoiceIndex;
+            console.log(`Auto-selected voice: ${voices[selectedVoiceIndex].name} for language: ${language}`);
+        }
+    }
+    
+    readNextChunk() {
+        if (!this.isReading || this.currentChunkIndex >= this.pageTextChunks.length) {
+            this.stopReading();
+            return;
+        }
+        
+        const chunk = this.pageTextChunks[this.currentChunkIndex];
+        const utterance = new SpeechSynthesisUtterance(chunk);
+        
+        // Apply voice settings
+        const voiceSelect = document.getElementById('voiceSelect');
+        const selectedVoiceIndex = voiceSelect.value;
+        
+        if (selectedVoiceIndex && selectedVoiceIndex !== '') {
+            const voices = this.speechSynthesis.getVoices();
+            utterance.voice = voices[selectedVoiceIndex];
+        }
+        
+        // Apply speech settings
+        utterance.rate = parseFloat(document.getElementById('speechRate').value);
+        utterance.pitch = parseFloat(document.getElementById('speechPitch').value);
+        utterance.volume = parseFloat(document.getElementById('speechVolume').value);
+        
+        // Event handlers
+        utterance.onstart = () => {
+            this.showSpeechStatus('Reading...', 'speaking');
+            this.updateCurrentText(chunk);
+        };
+        
+        utterance.onend = () => {
+            if (this.isReading) {
+                this.currentChunkIndex++;
+                this.updateProgress();
+                // Small delay between chunks for better listening experience
+                setTimeout(() => this.readNextChunk(), 100);
+            }
+        };
+        
+        utterance.onerror = (event) => {
+            console.error('Speech synthesis error:', event);
+            this.showSpeechStatus('Error occurred during reading', 'error');
+            this.stopReading();
+        };
+        
+        this.currentUtterance = utterance;
+        this.speechSynthesis.speak(utterance);
+    }
+    
+    pauseReading() {
+        if (this.isReading && !this.isPaused) {
+            this.speechSynthesis.pause();
+            this.isPaused = true;
+            this.updatePlaybackControls('paused');
+            this.showSpeechStatus('Reading paused', 'paused');
+        }
+    }
+    
+    stopReading() {
+        this.speechSynthesis.cancel();
+        this.isReading = false;
+        this.isPaused = false;
+        this.currentChunkIndex = 0;
+        this.currentUtterance = null;
+        
+        this.updatePlaybackControls('stopped');
+        this.showSpeechStatus('Ready to read...', '');
+        this.updateCurrentText('Ready to read...');
+        this.updateProgress(0);
+    }
+    
+    updatePlaybackControls(state) {
+        const playButton = document.getElementById('playButton');
+        const pauseButton = document.getElementById('pauseButton');
+        const stopButton = document.getElementById('stopButton');
+        
+        switch (state) {
+            case 'playing':
+                playButton.disabled = true;
+                pauseButton.disabled = false;
+                stopButton.disabled = false;
+                playButton.innerHTML = '<span class="btn-icon">▶️</span>Playing';
+                break;
+            case 'paused':
+                playButton.disabled = false;
+                pauseButton.disabled = true;
+                stopButton.disabled = false;
+                playButton.innerHTML = '<span class="btn-icon">▶️</span>Resume';
+                break;
+            case 'stopped':
+            default:
+                playButton.disabled = false;
+                pauseButton.disabled = true;
+                stopButton.disabled = true;
+                playButton.innerHTML = '<span class="btn-icon">▶️</span>Play';
+                break;
+        }
+    }
+    
+    updateProgress(progress = null) {
+        if (progress !== null) {
+            const progressFill = document.getElementById('progressFill');
+            progressFill.style.width = progress + '%';
+        } else if (this.pageTextChunks.length > 0) {
+            const progressPercent = (this.currentChunkIndex / this.pageTextChunks.length) * 100;
+            const progressFill = document.getElementById('progressFill');
+            progressFill.style.width = progressPercent + '%';
+        }
+    }
+    
+    updateCurrentText(text) {
+        const currentTextEl = document.getElementById('currentText');
+        // Truncate long text for display
+        const displayText = text.length > 60 ? text.substring(0, 57) + '...' : text;
+        currentTextEl.textContent = displayText;
+    }
+    
+    showSpeechStatus(message, type = '') {
+        // Remove existing status if any
+        const existingStatus = document.querySelector('.speech-status');
+        if (existingStatus) {
+            existingStatus.remove();
+        }
+        
+        if (type) {
+            // Create new status element
+            const statusEl = document.createElement('div');
+            statusEl.className = `speech-status ${type}`;
+            statusEl.textContent = message;
+            
+            // Add to read aloud options
+            const readAloudOptions = document.getElementById('readAloudOptions');
+            readAloudOptions.appendChild(statusEl);
+            
+            // Auto-remove error messages after 5 seconds
+            if (type === 'error') {
+                setTimeout(() => {
+                    if (statusEl.parentElement) {
+                        statusEl.remove();
+                    }
+                }, 5000);
+            }
         }
     }
 }
