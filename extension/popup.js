@@ -540,7 +540,8 @@ class SmartNotesPopup {
             
             const pageContent = result.result;
             
-            this.showTranslationStatus(`Translating to ${targetLanguage}...`, 'loading');
+            this.showTranslationStatus(`🔄 Translating to ${targetLanguage}...`, 'loading');
+            this.addTranslationProgressBar();
             
             // Send content to backend for translation
             const response = await fetch(`${this.backendUrl}/translate`, {
@@ -579,130 +580,13 @@ class SmartNotesPopup {
                 throw new Error(data.error || 'Translation failed');
             }
             
-            this.showTranslationStatus('Applying translation to page...', 'loading');
+            this.showTranslationStatus('🎨 Applying translation with visual highlighting...', 'loading');
             
-            // Apply translation to the page
-            await chrome.scripting.executeScript({
-                target: { tabId: tab.id },
-                function: (translatedContent) => {
-                    // Enhanced function to translate the entire page
-                    function translateEntirePage(translatedText) {
-                        const textNodes = [];
-                        const originalTexts = [];
-                        
-                        // Use same traversal logic as extraction to ensure we get all nodes
-                        const walker = document.createTreeWalker(
-                            document.documentElement, // Start from html element to get everything
-                            NodeFilter.SHOW_TEXT,
-                            {
-                                acceptNode: function(node) {
-                                    // Skip script, style, noscript elements
-                                    if (node.parentElement && 
-                                        ['SCRIPT', 'STYLE', 'NOSCRIPT', 'META', 'LINK', 'HEAD'].includes(node.parentElement.tagName)) {
-                                        return NodeFilter.FILTER_REJECT;
-                                    }
-                                    
-                                    // Only include nodes with meaningful text content
-                                    const text = node.nodeValue.trim();
-                                    if (text.length > 0) {
-                                        return NodeFilter.FILTER_ACCEPT;
-                                    }
-                                    return NodeFilter.FILTER_REJECT;
-                                }
-                            }
-                        );
-                        
-                        let node;
-                        while (node = walker.nextNode()) {
-                            const text = node.nodeValue.trim();
-                            if (text) {
-                                textNodes.push(node);
-                                originalTexts.push(text);
-                            }
-                        }
-                        
-                        console.log(`Found ${textNodes.length} text nodes to translate`);
-                        
-                        // Split translated content into words for better distribution
-                        const translatedWords = translatedText.split(/\s+/).filter(word => word.trim());
-                        const originalWords = originalTexts.join(' ').split(/\s+/).filter(word => word.trim());
-                        
-                        console.log(`Original words: ${originalWords.length}, Translated words: ${translatedWords.length}`);
-                        
-                        // Create a more sophisticated mapping
-                        let wordIndex = 0;
-                        const wordRatio = translatedWords.length / originalWords.length;
-                        
-                        textNodes.forEach((node, nodeIndex) => {
-                            const originalNodeText = node.nodeValue.trim();
-                            const nodeWords = originalNodeText.split(/\s+/).filter(word => word.trim());
-                            
-                            if (nodeWords.length > 0) {
-                                // Calculate how many translated words this node should get
-                                const expectedTranslatedWords = Math.ceil(nodeWords.length * wordRatio);
-                                const endIndex = Math.min(wordIndex + expectedTranslatedWords, translatedWords.length);
-                                
-                                // Get the translated words for this node
-                                const nodeTranslatedWords = translatedWords.slice(wordIndex, endIndex);
-                                
-                                if (nodeTranslatedWords.length > 0) {
-                                    // Preserve original spacing and punctuation patterns
-                                    let newText = nodeTranslatedWords.join(' ');
-                                    
-                                    // Try to preserve some formatting patterns
-                                    if (originalNodeText.endsWith('.')) newText += '.';
-                                    else if (originalNodeText.endsWith('!')) newText += '!';
-                                    else if (originalNodeText.endsWith('?')) newText += '?';
-                                    else if (originalNodeText.endsWith(',')) newText += ',';
-                                    else if (originalNodeText.endsWith(':')) newText += ':';
-                                    else if (originalNodeText.endsWith(';')) newText += ';';
-                                    
-                                    // Preserve leading/trailing whitespace from original
-                                    const leadingWhitespace = node.nodeValue.match(/^\s*/)[0];
-                                    const trailingWhitespace = node.nodeValue.match(/\s*$/)[0];
-                                    
-                                    node.nodeValue = leadingWhitespace + newText + trailingWhitespace;
-                                    wordIndex = endIndex;
-                                }
-                            }
-                        });
-                        
-                        return textNodes.length;
-                    }
-                    
-                    // Perform the translation
-                    const translatedNodeCount = translateEntirePage(translatedContent);
-                    console.log(`Translated ${translatedNodeCount} text nodes`);
-                    
-                    // Add a visual indicator that the page has been translated
-                    const indicator = document.createElement('div');
-                    indicator.innerHTML = `🌐 Page translated (${translatedNodeCount} nodes)`;
-                    indicator.style.cssText = `
-                        position: fixed;
-                        top: 10px;
-                        right: 10px;
-                        background: #00b894;
-                        color: white;
-                        padding: 8px 12px;
-                        border-radius: 6px;
-                        font-size: 12px;
-                        z-index: 10000;
-                        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-                        max-width: 200px;
-                    `;
-                    document.body.appendChild(indicator);
-                    
-                    // Remove indicator after 4 seconds
-                    setTimeout(() => {
-                        if (indicator.parentElement) {
-                            indicator.parentElement.removeChild(indicator);
-                        }
-                    }, 4000);
-                },
-                args: [data.translated_content]
-            });
+            // Apply translation to the page with progressive highlighting
+            await this.applyTranslationWithHighlighting(tab.id, data.translated_content, targetLanguage);
             
-            this.showTranslationStatus(`✓ Page translated to ${targetLanguage}!`, 'success');
+            this.showTranslationStatus(`✨ Page translated to ${targetLanguage} with visual highlighting!`, 'success');
+            this.removeTranslationProgressBar();
             
             // Update current language for read aloud feature
             this.currentLanguage = this.getLanguageCodeFromName(targetLanguage);
@@ -718,11 +602,319 @@ class SmartNotesPopup {
         } catch (error) {
             console.error('Translation error:', error);
             this.showTranslationStatus(`✗ Translation failed: ${error.message}`, 'error');
+            this.removeTranslationProgressBar(); // Clean up progress bar on error
         } finally {
             // Reset button state
             const translateBtn = document.getElementById('startTranslation');
             translateBtn.disabled = false;
             translateBtn.innerHTML = '<span class="btn-icon">🔄</span>Start Translation';
+        }
+    }
+    
+    async applyTranslationWithHighlighting(tabId, translatedContent, targetLanguage) {
+        try {
+            // First, inject the highlighting styles
+            await chrome.scripting.insertCSS({
+                target: { tabId: tabId },
+                css: `
+                    .smart-notes-translating {
+                        background: linear-gradient(90deg, #3498db, #74b9ff) !important;
+                        color: white !important;
+                        padding: 2px 4px !important;
+                        border-radius: 3px !important;
+                        transition: all 0.3s ease !important;
+                        box-shadow: 0 2px 4px rgba(52, 152, 219, 0.3) !important;
+                        animation: translationPulse 1s infinite alternate !important;
+                    }
+                    
+                    .smart-notes-translated {
+                        background: linear-gradient(90deg, #27ae60, #00b894) !important;
+                        color: white !important;
+                        padding: 2px 4px !important;
+                        border-radius: 3px !important;
+                        transition: all 0.5s ease !important;
+                        box-shadow: 0 2px 4px rgba(39, 174, 96, 0.3) !important;
+                    }
+                    
+                    .smart-notes-translation-fade {
+                        background: transparent !important;
+                        color: inherit !important;
+                        padding: 0 !important;
+                        border-radius: 0 !important;
+                        box-shadow: none !important;
+                        transition: all 1s ease !important;
+                    }
+                    
+                    @keyframes translationPulse {
+                        0% { opacity: 0.8; transform: scale(1); }
+                        100% { opacity: 1; transform: scale(1.02); }
+                    }
+                    
+                    .smart-notes-progress-bar {
+                        position: fixed !important;
+                        top: 0 !important;
+                        left: 0 !important;
+                        height: 4px !important;
+                        background: linear-gradient(90deg, #3498db, #74b9ff) !important;
+                        z-index: 10001 !important;
+                        transition: width 0.3s ease !important;
+                        box-shadow: 0 2px 10px rgba(52, 152, 219, 0.5) !important;
+                    }
+                `
+            });
+            
+            // Apply translation with progressive highlighting
+            await chrome.scripting.executeScript({
+                target: { tabId: tabId },
+                function: (translatedContent, targetLang) => {
+                    return new Promise((resolve) => {
+                        // Create progress bar
+                        const progressBar = document.createElement('div');
+                        progressBar.className = 'smart-notes-progress-bar';
+                        progressBar.style.width = '0%';
+                        document.body.appendChild(progressBar);
+                        
+                        // Enhanced function to translate with highlighting
+                        function translateWithHighlighting(translatedText) {
+                            const textNodes = [];
+                            const originalTexts = [];
+                            
+                            // Get all text nodes
+                            const walker = document.createTreeWalker(
+                                document.documentElement,
+                                NodeFilter.SHOW_TEXT,
+                                {
+                                    acceptNode: function(node) {
+                                        if (node.parentElement && 
+                                            ['SCRIPT', 'STYLE', 'NOSCRIPT', 'META', 'LINK', 'HEAD'].includes(node.parentElement.tagName)) {
+                                            return NodeFilter.FILTER_REJECT;
+                                        }
+                                        
+                                        const text = node.nodeValue.trim();
+                                        if (text.length > 0) {
+                                            return NodeFilter.FILTER_ACCEPT;
+                                        }
+                                        return NodeFilter.FILTER_REJECT;
+                                    }
+                                }
+                            );
+                            
+                            let node;
+                            while (node = walker.nextNode()) {
+                                const text = node.nodeValue.trim();
+                                if (text) {
+                                    textNodes.push(node);
+                                    originalTexts.push(text);
+                                }
+                            }
+                            
+                            console.log(`Found ${textNodes.length} text nodes to translate`);
+                            
+                            // Split content for mapping
+                            const translatedWords = translatedText.split(/\s+/).filter(word => word.trim());
+                            const originalWords = originalTexts.join(' ').split(/\s+/).filter(word => word.trim());
+                            const wordRatio = translatedWords.length / originalWords.length;
+                            
+                            let wordIndex = 0;
+                            let processedNodes = 0;
+                            
+                            // Process nodes progressively with highlighting
+                            function processNextNode() {
+                                if (processedNodes >= textNodes.length) {
+                                    // All nodes processed, show completion
+                                    setTimeout(() => {
+                                        // Fade out highlighting
+                                        document.querySelectorAll('.smart-notes-translated').forEach(el => {
+                                            el.classList.add('smart-notes-translation-fade');
+                                        });
+                                        
+                                        // Remove progress bar
+                                        if (progressBar.parentElement) {
+                                            progressBar.parentElement.removeChild(progressBar);
+                                        }
+                                        
+                                        // Add completion indicator
+                                        const indicator = document.createElement('div');
+                                        indicator.innerHTML = `🌐 Page translated to ${targetLang} (${textNodes.length} nodes)`;
+                                        indicator.style.cssText = `
+                                            position: fixed;
+                                            top: 20px;
+                                            right: 20px;
+                                            background: linear-gradient(135deg, #27ae60, #00b894);
+                                            color: white;
+                                            padding: 12px 16px;
+                                            border-radius: 8px;
+                                            font-size: 14px;
+                                            z-index: 10002;
+                                            box-shadow: 0 4px 20px rgba(39, 174, 96, 0.3);
+                                            max-width: 300px;
+                                            animation: slideInRight 0.5s ease;
+                                        `;
+                                        
+                                        // Add slide-in animation
+                                        const style = document.createElement('style');
+                                        style.textContent = `
+                                            @keyframes slideInRight {
+                                                from { transform: translateX(100%); opacity: 0; }
+                                                to { transform: translateX(0); opacity: 1; }
+                                            }
+                                        `;
+                                        document.head.appendChild(style);
+                                        document.body.appendChild(indicator);
+                                        
+                                        // Remove indicator after 5 seconds
+                                        setTimeout(() => {
+                                            if (indicator.parentElement) {
+                                                indicator.style.transform = 'translateX(100%)';
+                                                indicator.style.opacity = '0';
+                                                setTimeout(() => {
+                                                    if (indicator.parentElement) {
+                                                        indicator.parentElement.removeChild(indicator);
+                                                    }
+                                                    if (style.parentElement) {
+                                                        style.parentElement.removeChild(style);
+                                                    }
+                                                }, 300);
+                                            }
+                                        }, 5000);
+                                        
+                                        // Remove highlighting classes after fade
+                                        setTimeout(() => {
+                                            document.querySelectorAll('.smart-notes-translation-fade').forEach(el => {
+                                                el.classList.remove('smart-notes-translated', 'smart-notes-translation-fade');
+                                            });
+                                        }, 1000);
+                                    }, 1000);
+                                    
+                                    resolve(textNodes.length);
+                                    return;
+                                }
+                                
+                                const node = textNodes[processedNodes];
+                                const originalNodeText = node.nodeValue.trim();
+                                const nodeWords = originalNodeText.split(/\s+/).filter(word => word.trim());
+                                
+                                if (nodeWords.length > 0) {
+                                    // Wrap the node in a span for highlighting
+                                    const parent = node.parentElement;
+                                    if (parent && !parent.classList.contains('smart-notes-translating')) {
+                                        const span = document.createElement('span');
+                                        span.className = 'smart-notes-translating';
+                                        span.textContent = originalNodeText;
+                                        
+                                        // Replace text node with highlighted span
+                                        parent.replaceChild(span, node);
+                                        
+                                        // Calculate translation for this node
+                                        const expectedTranslatedWords = Math.ceil(nodeWords.length * wordRatio);
+                                        const endIndex = Math.min(wordIndex + expectedTranslatedWords, translatedWords.length);
+                                        const nodeTranslatedWords = translatedWords.slice(wordIndex, endIndex);
+                                        
+                                        if (nodeTranslatedWords.length > 0) {
+                                            let newText = nodeTranslatedWords.join(' ');
+                                            
+                                            // Preserve punctuation
+                                            if (originalNodeText.endsWith('.')) newText += '.';
+                                            else if (originalNodeText.endsWith('!')) newText += '!';
+                                            else if (originalNodeText.endsWith('?')) newText += '?';
+                                            else if (originalNodeText.endsWith(',')) newText += ',';
+                                            else if (originalNodeText.endsWith(':')) newText += ':';
+                                            else if (originalNodeText.endsWith(';')) newText += ';';
+                                            
+                                            // Animate translation
+                                            setTimeout(() => {
+                                                span.textContent = newText;
+                                                span.classList.remove('smart-notes-translating');
+                                                span.classList.add('smart-notes-translated');
+                                                wordIndex = endIndex;
+                                            }, 200);
+                                        }
+                                    }
+                                }
+                                
+                                processedNodes++;
+                                
+                                // Update progress bar
+                                const progress = (processedNodes / textNodes.length) * 100;
+                                progressBar.style.width = progress + '%';
+                                
+                                // Process next node after a short delay
+                                setTimeout(processNextNode, 50); // 50ms delay between nodes
+                            }
+                            
+                            // Start processing
+                            processNextNode();
+                        }
+                        
+                        // Start translation with highlighting
+                        translateWithHighlighting(translatedContent);
+                    });
+                },
+                args: [translatedContent, targetLanguage]
+            });
+            
+        } catch (error) {
+            console.error('Error applying translation with highlighting:', error);
+            throw error;
+        }
+    }
+    
+    addTranslationProgressBar() {
+        // Add progress bar to translation options
+        const translateOptions = document.getElementById('translateOptions');
+        const existingProgress = translateOptions.querySelector('.translation-progress');
+        
+        if (!existingProgress) {
+            const progressContainer = document.createElement('div');
+            progressContainer.className = 'translation-progress';
+            progressContainer.innerHTML = `
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" id="translationProgressFill"></div>
+                </div>
+                <div class="progress-text">🔄 Processing translation...</div>
+            `;
+            
+            translateOptions.appendChild(progressContainer);
+            
+            // Start progress animation
+            const progressFill = document.getElementById('translationProgressFill');
+            let progress = 0;
+            const progressInterval = setInterval(() => {
+                progress = Math.min(progress + 2, 95); // Don't go to 100% until complete
+                if (progressFill) {
+                    progressFill.style.width = progress + '%';
+                }
+                if (progress >= 95) {
+                    clearInterval(progressInterval);
+                }
+            }, 100);
+            
+            // Store interval for cleanup
+            this.progressInterval = progressInterval;
+        }
+    }
+    
+    removeTranslationProgressBar() {
+        const progressContainer = document.querySelector('.translation-progress');
+        if (progressContainer) {
+            // Complete the progress bar first
+            const progressFill = document.getElementById('translationProgressFill');
+            if (progressFill) {
+                progressFill.style.width = '100%';
+            }
+            
+            // Remove after animation
+            setTimeout(() => {
+                if (progressContainer.parentElement) {
+                    progressContainer.parentElement.removeChild(progressContainer);
+                }
+            }, 1000);
+        }
+        
+        // Clean up interval
+        if (this.progressInterval) {
+            clearInterval(this.progressInterval);
+            this.progressInterval = null;
         }
     }
     

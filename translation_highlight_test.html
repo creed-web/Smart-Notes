@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Translation Highlighting Test Page</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+            background: #f8f9fa;
+        }
+        
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        h2 {
+            color: #3498db;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 5px;
+        }
+        
+        .intro {
+            background: #e8f4fd;
+            padding: 15px;
+            border-left: 4px solid #3498db;
+            margin: 20px 0;
+        }
+        
+        .feature-list {
+            background: #f0f8ff;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        
+        .feature-list ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        
+        .feature-list li {
+            margin: 8px 0;
+        }
+        
+        .highlight-demo {
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #ffeaa7;
+            margin: 20px 0;
+        }
+        
+        .code-block {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            margin: 15px 0;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            background: #34495e;
+            color: white;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌐 Smart Notes Translation with Progressive Highlighting</h1>
+        
+        <div class="intro">
+            <strong>Welcome to the Translation Test Page!</strong> This page is designed to test the new progressive highlighting feature. When you translate this page, you'll see each section being highlighted in blue as it gets translated, then transitioning to green when complete.
+        </div>
+
+        <h2>🎯 What You'll See</h2>
+        <p>When you activate the translation feature, the system will:</p>
+        <ol>
+            <li><strong>Show a progress bar</strong> at the top of the page indicating translation progress</li>
+            <li><strong>Highlight content in blue</strong> as it's being processed and translated</li>
+            <li><strong>Change to green highlighting</strong> when each section is successfully translated</li>
+            <li><strong>Gradually fade the highlighting</strong> to show the final translated content</li>
+            <li><strong>Display a completion notification</strong> when the entire page is translated</li>
+        </ol>
+
+        <h2>✨ New Highlighting Features</h2>
+        <div class="feature-list">
+            <ul>
+                <li><strong>Progressive Visual Feedback:</strong> See exactly which content is being translated in real-time</li>
+                <li><strong>Blue Highlighting:</strong> Content currently being translated pulses with a blue background</li>
+                <li><strong>Green Confirmation:</strong> Successfully translated content shows a green background</li>
+                <li><strong>Smooth Animations:</strong> All transitions are smooth and non-disruptive</li>
+                <li><strong>Progress Tracking:</strong> A progress bar shows overall translation completion</li>
+                <li><strong>Auto-Cleanup:</strong> Highlighting automatically fades away after completion</li>
+            </ul>
+        </div>
+
+        <h2>🔍 How It Works</h2>
+        <p>The translation highlighting system uses advanced DOM manipulation to:</p>
+        
+        <div class="highlight-demo">
+            <strong>Step 1:</strong> Extract all text content from the webpage while preserving the original structure and formatting.
+        </div>
+        
+        <div class="highlight-demo">
+            <strong>Step 2:</strong> Send content to our AI translation service (powered by Google's Gemini API) for high-quality translation.
+        </div>
+        
+        <div class="highlight-demo">
+            <strong>Step 3:</strong> Apply translations progressively with visual highlighting to show which content is being processed.
+        </div>
+        
+        <div class="highlight-demo">
+            <strong>Step 4:</strong> Clean up highlighting and show the final translated page with preserved formatting.
+        </div>
+
+        <h2>🚀 Technical Implementation</h2>
+        <p>The highlighting system includes several sophisticated features:</p>
+        
+        <div class="code-block">
+// CSS Classes Used:
+.smart-notes-translating  → Blue pulsing background for content being translated
+.smart-notes-translated   → Green background for completed translations  
+.smart-notes-progress-bar → Top progress bar showing overall completion
+        </div>
+
+        <h2>🌍 Supported Languages</h2>
+        <p>You can translate this page to any of these languages and see the highlighting in action:</p>
+        <ul>
+            <li>Spanish (Español) - Try translating to see "Hola mundo" effects!</li>
+            <li>French (Français) - Watch "Bonjour le monde" highlighting!</li>
+            <li>German (Deutsch) - See "Hallo Welt" progressive translation!</li>
+            <li>Italian (Italiano) - Experience "Ciao mondo" visual feedback!</li>
+            <li>Portuguese (Português) - Observe "Olá mundo" highlighting!</li>
+            <li>Chinese (中文) - View progressive "你好世界" translation!</li>
+            <li>Japanese (日本語) - See "こんにちは世界" highlighting effects!</li>
+            <li>Hindi (हिन्दी) - Watch "नमस्ते दुनिया" visual feedback!</li>
+        </ul>
+
+        <h2>📊 Performance Benefits</h2>
+        <p>The new highlighting system provides several advantages:</p>
+        <ul>
+            <li><strong>User Engagement:</strong> Users can see translation progress in real-time</li>
+            <li><strong>Error Detection:</strong> If translation fails, it's immediately obvious which content wasn't processed</li>
+            <li><strong>Quality Assurance:</strong> Users can verify that all content was properly translated</li>
+            <li><strong>Professional Experience:</strong> The smooth animations make the tool feel polished and modern</li>
+        </ul>
+
+        <h2>🎮 How to Test</h2>
+        <ol>
+            <li>Make sure the Smart Notes backend server is running with Gemini API configured</li>
+            <li>Load the Smart Notes Chrome extension</li>
+            <li>Navigate to this test page</li>
+            <li>Click the extension icon and select "🌐 Translate"</li>
+            <li>Choose any target language from the dropdown</li>
+            <li>Click "Start Translation" and watch the magic happen!</li>
+        </ol>
+
+        <div class="footer">
+            <h3>🎉 Ready to Test?</h3>
+            <p>Use the Smart Notes extension to translate this page and experience the new progressive highlighting feature!</p>
+            <p><strong>Tip:</strong> Try different languages to see how the highlighting adapts to different text lengths and structures.</p>
+        </div>
+    </div>
+
+    <script>
+        // Add some dynamic content for testing
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Translation highlighting test page loaded successfully!');
+            
+            // Add a timestamp
+            const timestamp = new Date().toLocaleString();
+            const timestampElement = document.createElement('p');
+            timestampElement.innerHTML = `<small>Page loaded at: ${timestamp}</small>`;
+            timestampElement.style.textAlign = 'center';
+            timestampElement.style.color = '#666';
+            timestampElement.style.marginTop = '20px';
+            document.querySelector('.footer').appendChild(timestampElement);
+        });
+    </script>
+</body>
+</html>

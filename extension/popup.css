@@ -695,6 +695,48 @@ body {
     text-align: center;
 }
 
+/* Translation progress bar */
+.translation-progress {
+    margin-top: 15px;
+    padding: 10px 12px;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    animation: slideDown 0.3s ease-out;
+}
+
+.progress-bar-container {
+    width: 100%;
+    height: 8px;
+    background: #e9ecef;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #3498db, #74b9ff);
+    width: 0%;
+    transition: width 0.3s ease;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(52, 152, 219, 0.3);
+    animation: progressShimmer 1.5s infinite;
+}
+
+.progress-text {
+    font-size: 11px;
+    color: #495057;
+    text-align: center;
+    font-weight: 500;
+}
+
+@keyframes progressShimmer {
+    0% { opacity: 0.8; }
+    50% { opacity: 1; }
+    100% { opacity: 0.8; }
+}
+
 .translation-status.success {
     background: #d4edda;
     color: #155724;
