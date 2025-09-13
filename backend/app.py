@@ -50,9 +50,17 @@ class SmartNotesApp:
         # Configuration
         self.HF_API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-small"
         self.HF_TOKEN = os.getenv('HUGGINGFACE_API_TOKEN')
+        self.GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
         self.MAX_CHUNK_SIZE = 1000  # Max words per chunk
         self.MIN_SUMMARY_LENGTH = 50
         self.MAX_SUMMARY_LENGTH = 300
+        
+        # Translation service priority (try Gemini first, then HuggingFace)
+        self.translation_services = []
+        if self.GEMINI_API_KEY:
+            self.translation_services.append('gemini')
+        if self.HF_TOKEN:
+            self.translation_services.append('huggingface')
         
         # Initialize export system
         self.export_system = ExportSystem()
@@ -202,12 +210,15 @@ class SmartNotesApp:
         def translate_page():
             """Translate web page content to specified language"""
             try:
-                # Check if API token is configured
-                if not self.HF_TOKEN:
-                    logger.error("Hugging Face API token not configured")
+                # Check if any translation service is configured
+                if not self.translation_services:
+                    logger.error("No translation services configured")
+                    error_msg = 'Translation service not configured. Please set either:\n'
+                    error_msg += '• GEMINI_API_KEY (recommended): Get from https://makersuite.google.com/app/apikey\n'
+                    error_msg += '• HUGGINGFACE_API_TOKEN: Get from https://huggingface.co/settings/tokens'
                     return jsonify({
                         'success': False,
-                        'error': 'Translation service not configured. Please set HUGGINGFACE_API_TOKEN environment variable. Get your token at https://huggingface.co/settings/tokens'
+                        'error': error_msg
                     }), 500
                 
                 data = request.json
@@ -1074,49 +1085,157 @@ Notes to organize: {combined_content}"""
             logger.error(f"General model translation failed: {str(e)}")
             return text  # Return original text as fallback
     
-    def translate_content_with_retry(self, content, target_language, source_language="auto", max_retries=3):
-        """Translate content with retry logic and better error handling"""
-        import time
-        
-        last_error = None
-        
-        for attempt in range(max_retries):
-            try:
-                logger.info(f"Translation attempt {attempt + 1}/{max_retries}")
-                translated = self.translate_content(content, target_language, source_language)
-                
-                # Validate translation result
-                if translated and translated.strip() and translated != content:
-                    logger.info(f"Translation successful on attempt {attempt + 1}")
+    def translate_with_gemini(self, content, target_language, source_language="auto"):
+        """Translate content using Google Gemini API with direct HTTP requests"""
+        try:
+            import json
+            
+            # Language mapping for better prompts
+            language_names = {
+                'spanish': 'Spanish',
+                'french': 'French', 
+                'german': 'German',
+                'italian': 'Italian',
+                'portuguese': 'Portuguese',
+                'dutch': 'Dutch',
+                'chinese': 'Chinese (Simplified)',
+                'japanese': 'Japanese',
+                'korean': 'Korean',
+                'arabic': 'Arabic',
+                'russian': 'Russian',
+                'hindi': 'Hindi'
+            }
+            
+            target_lang_name = language_names.get(target_language.lower(), target_language)
+            
+            # Create translation prompt
+            prompt = f"""Translate the following text to {target_lang_name}. 
+Provide only the translation without any additional text or explanations.
+
+Text to translate:
+{content}
+
+Translation:"""
+            
+            # Gemini API endpoint
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={self.GEMINI_API_KEY}"
+            
+            # Request payload
+            payload = {
+                "contents": [{
+                    "parts": [{
+                        "text": prompt
+                    }]
+                }],
+                "generationConfig": {
+                    "temperature": 0.1,  # Low temperature for consistent translation
+                    "topK": 1,
+                    "topP": 1,
+                    "maxOutputTokens": 2048
+                }
+            }
+            
+            headers = {
+                "Content-Type": "application/json"
+            }
+            
+            logger.info(f"Using Gemini API for translation to {target_language}")
+            response = requests.post(url, json=payload, headers=headers, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if 'candidates' in result and result['candidates']:
+                    translated = result['candidates'][0]['content']['parts'][0]['text'].strip()
+                    
+                    # Remove any leading "Translation:" if Gemini adds it
+                    if translated.lower().startswith('translation:'):
+                        translated = translated[12:].strip()
+                    
+                    # Clean up any remaining prefixes
+                    lines = translated.split('\n')
+                    if lines:
+                        translated = lines[-1].strip() if len(lines) > 1 else lines[0].strip()
+                    
                     return translated
                 else:
-                    logger.warning(f"Translation attempt {attempt + 1} returned empty or unchanged content")
-                    if attempt < max_retries - 1:
-                        time.sleep(1)  # Wait before retry
+                    raise ValueError("Gemini returned unexpected response format")
+            else:
+                error_msg = f"Gemini API request failed: {response.status_code}"
+                try:
+                    error_data = response.json()
+                    error_msg += f" - {error_data}"
+                except:
+                    error_msg += f" - {response.text}"
+                raise ValueError(error_msg)
+                
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Gemini API network error: {str(e)}")
+            raise ValueError(f"Gemini API network error: {str(e)}")
+        except Exception as e:
+            logger.error(f"Gemini translation failed: {str(e)}")
+            raise ValueError(f"Gemini translation failed: {str(e)}")
+    
+    def translate_content_with_retry(self, content, target_language, source_language="auto", max_retries=3):
+        """Translate content with retry logic and multiple service support"""
+        import time
+        
+        last_errors = []
+        
+        # Try each available translation service
+        for service in self.translation_services:
+            logger.info(f"Trying translation with {service} service")
+            
+            for attempt in range(max_retries):
+                try:
+                    logger.info(f"{service} translation attempt {attempt + 1}/{max_retries}")
+                    
+                    if service == 'gemini':
+                        translated = self.translate_with_gemini(content, target_language, source_language)
+                    elif service == 'huggingface':
+                        translated = self.translate_content(content, target_language, source_language)
+                    else:
                         continue
                     
-            except requests.exceptions.Timeout as e:
-                last_error = f"Request timeout: {str(e)}"
-                logger.warning(f"Translation attempt {attempt + 1} timed out: {e}")
-            except requests.exceptions.ConnectionError as e:
-                last_error = f"Connection error: {str(e)}"
-                logger.warning(f"Translation attempt {attempt + 1} connection failed: {e}")
-            except requests.exceptions.RequestException as e:
-                last_error = f"Request failed: {str(e)}"
-                logger.warning(f"Translation attempt {attempt + 1} request failed: {e}")
-            except Exception as e:
-                last_error = f"Translation error: {str(e)}"
-                logger.warning(f"Translation attempt {attempt + 1} failed: {e}")
+                    # Validate translation result
+                    if translated and translated.strip() and translated != content:
+                        logger.info(f"Translation successful with {service} on attempt {attempt + 1}")
+                        return translated
+                    else:
+                        logger.warning(f"{service} attempt {attempt + 1} returned empty or unchanged content")
+                        if attempt < max_retries - 1:
+                            time.sleep(1)  # Wait before retry
+                            continue
+                    
+                except requests.exceptions.Timeout as e:
+                    error_msg = f"{service} request timeout: {str(e)}"
+                    last_errors.append(error_msg)
+                    logger.warning(f"{service} attempt {attempt + 1} timed out: {e}")
+                except requests.exceptions.ConnectionError as e:
+                    error_msg = f"{service} connection error: {str(e)}"
+                    last_errors.append(error_msg)
+                    logger.warning(f"{service} attempt {attempt + 1} connection failed: {e}")
+                except requests.exceptions.RequestException as e:
+                    error_msg = f"{service} request failed: {str(e)}"
+                    last_errors.append(error_msg)
+                    logger.warning(f"{service} attempt {attempt + 1} request failed: {e}")
+                except Exception as e:
+                    error_msg = f"{service} translation error: {str(e)}"
+                    last_errors.append(error_msg)
+                    logger.warning(f"{service} attempt {attempt + 1} failed: {e}")
+                
+                # Wait before retry (exponential backoff)
+                if attempt < max_retries - 1:
+                    wait_time = (attempt + 1) * 2  # 2, 4, 6 seconds
+                    logger.info(f"Waiting {wait_time} seconds before retry...")
+                    time.sleep(wait_time)
             
-            # Wait before retry (exponential backoff)
-            if attempt < max_retries - 1:
-                wait_time = (attempt + 1) * 2  # 2, 4, 6 seconds
-                logger.info(f"Waiting {wait_time} seconds before retry...")
-                time.sleep(wait_time)
+            # If this service failed all attempts, try the next service
+            logger.warning(f"{service} service failed after {max_retries} attempts, trying next service")
         
-        # All attempts failed
-        error_msg = last_error or "Translation failed after all attempts"
-        logger.error(f"Translation failed after {max_retries} attempts: {error_msg}")
+        # All services and attempts failed
+        error_summary = "; ".join(last_errors[-3:])  # Show last 3 errors
+        error_msg = f"Translation failed with all available services. Last errors: {error_summary}"
+        logger.error(error_msg)
         raise ValueError(error_msg)
     
     def get_supported_translation_languages(self):
@@ -1144,11 +1263,26 @@ def create_app():
 if __name__ == '__main__':
     app = create_app()
     
-    # Check for Hugging Face token
-    if not os.getenv('HUGGINGFACE_API_TOKEN'):
-        logger.warning("HUGGINGFACE_API_TOKEN environment variable not set!")
-        print("Please set your Hugging Face API token:")
-        print("export HUGGINGFACE_API_TOKEN='your_token_here'")
+    # Check for API tokens and show available services
+    smart_notes = SmartNotesApp()
+    available_services = smart_notes.translation_services
+    
+    print("\n" + "=" * 50)
+    print("🌐 Smart Notes Translation Services")
+    print("=" * 50)
+    
+    if available_services:
+        print(f"✅ Available translation services: {', '.join(available_services)}")
+    else:
+        print("❌ No translation services configured!")
+        print("\nTo enable translation, set one of these API keys:")
+        print("• GEMINI_API_KEY (recommended): https://makersuite.google.com/app/apikey")
+        print("• HUGGINGFACE_API_TOKEN: https://huggingface.co/settings/tokens")
+        print("\nExample:")
+        print("  $env:GEMINI_API_KEY='your_gemini_key_here'")
+    
+    print("\n💡 To test translation: python setup_translation.py")
+    print("=" * 50 + "\n")
     
     # Run the app
     app.run(host='0.0.0.0', port=5000, debug=True)
